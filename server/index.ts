@@ -23,6 +23,7 @@ const RPC: Record<string, Handler> = {
   'challenge.addScreenshot': challenge.addScreenshot as Handler,
   'challenge.sendMessage': challenge.sendMessage as Handler,
   'challenge.reportScore': challenge.reportScore as Handler,
+  'challenge.setRoomCode': challenge.setRoomCode as Handler,
   'challenge.openDispute': challenge.openDispute as Handler,
   'challenge.resolveDispute': challenge.resolveDispute as Handler,
   'user.updateProfile': user.updateProfile as Handler,

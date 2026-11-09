@@ -28,7 +28,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 const PAGES = [
   { icon: Gamepad2, title: 'Défiez les Meilleurs', description: 'Créez des défis eFootball et affrontez des joueurs du monde entier', color: 'var(--cyan)' },
   { icon: Wallet, title: 'Grimpez au Classement', description: 'Gagnez des SkillCoins et des points de niveau à chaque victoire', color: 'var(--yellow)' },
-  { icon: Video, title: 'Streamez en Direct', description: 'Diffusez vos défis et prouvez vos talents en live', color: 'var(--cyan)' },
+  { icon: Video, title: 'Partagez vos Lives', description: 'Diffusez vos matchs sur TikTok ou YouTube et faites-les voir à la communauté', color: 'var(--cyan)' },
 ]
 
 export function OnboardingScreen() {

@@ -16,7 +16,7 @@ export const userService = {
   },
   addFriend: (friendId: string) => rpc('user.addFriend', { friendId }),
   removeFriend: (friendId: string) => rpc('user.removeFriend', { friendId }),
-  updateProfile: (p: { pseudo?: string; country?: string; phone?: string; profilePhoto?: string | null }) => rpc('user.updateProfile', p),
+  updateProfile: (p: { pseudo?: string; country?: string; phone?: string; profilePhoto?: string | null; efootballId?: string }) => rpc('user.updateProfile', p),
 }
 
 export const winRate = (u: User) => (u.stats.wins + u.stats.losses > 0 ? u.stats.wins / (u.stats.wins + u.stats.losses) : 0)

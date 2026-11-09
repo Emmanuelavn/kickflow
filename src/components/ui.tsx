@@ -134,8 +134,9 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
   const [snacks, setSnacks] = useState<Snack[]>([])
   const show = useCallback((text: string, kind: SnackKind = 'default') => {
     const id = Date.now() + Math.random()
-    setSnacks((s) => [...s, { id, text, kind }])
-    setTimeout(() => setSnacks((s) => s.filter((x) => x.id !== id)), 3500)
+    // Un seul message à la fois : le nouveau remplace l'ancien
+    setSnacks([{ id, text, kind }])
+    setTimeout(() => setSnacks((s) => s.filter((x) => x.id !== id)), 3000)
   }, [])
   return (
     <SnackCtx.Provider value={show}>

@@ -35,8 +35,8 @@ export interface User {
   updatedAt: string
   /** Rôle arbitre/admin (pour l'écran des litiges). */
   isAdmin?: boolean
-  /** Empreinte SHA-256 du mot de passe (absente pour les comptes démo / OTP / social). */
-  passwordHash?: string
+  /** Identifiant du joueur dans eFootball, pour s'ajouter en ami. */
+  efootballId?: string
 }
 
 export type ChallengeStatus = 'pending' | 'accepted' | 'inProgress' | 'completed' | 'cancelled' | 'disputed'
@@ -82,6 +82,8 @@ export interface MatchDetails {
   scoreDetectionInfo?: ScoreDetectionInfo | null
   /** Score déclaré par chaque joueur (clé = id du joueur). Validé si les deux concordent. */
   reports?: Record<string, ScoreReport>
+  /** Code de salle eFootball partagé par un joueur. */
+  roomCode?: string | null
   /** Les gains ont déjà été versés (pour pouvoir les annuler en cas de litige). */
   paidOut?: boolean
 }
@@ -119,6 +121,8 @@ export interface Challenge {
   matchDetails?: MatchDetails | null
   dispute?: DisputeInfo | null
   completedAt?: string | null
+  /** Défi lancé directement à un joueur (revanche, ami). */
+  invitedUserId?: string | null
 }
 
 export type TransactionType = 'deposit' | 'withdraw' | 'transfer' | 'win' | 'loss' | 'commission' | 'referralBonus'
@@ -263,6 +267,9 @@ export interface Stream {
   duration: number
   quality: StreamQuality
   createdAt: string
+  /** Lien du live (TikTok, YouTube, Facebook…). */
+  url?: string
+  title?: string
 }
 
 export type PollCategory = string

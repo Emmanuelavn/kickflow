@@ -72,6 +72,7 @@ export async function register(a: Record<string, unknown>) {
       stats: { wins: 0, losses: 0, totalEarned: 0, totalLost: 0, level: 1, xp: 0 },
       walletBalance: { available: SIGNUP_BONUS, pending: 0, withdrawable: 0 },
       friendIds: [], badges: [], createdAt: ts, updatedAt: ts, isAdmin: ADMIN_EMAILS.includes(email),
+      efootballId: typeof a.efootballId === 'string' ? a.efootballId.trim().slice(0, 40) : '',
     }
     await t.client.query('insert into accounts (user_id, email, password_hash) values ($1, $2, $3)', [id, email, hash])
     await t.put('users', u)

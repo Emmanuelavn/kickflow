@@ -161,14 +161,20 @@ export const challenge = {
     const stake = amount(a.amount)
     const type = (['public', 'friends', 'private'] as ChallengeType[]).includes(a.challengeType as ChallengeType) ? a.challengeType as ChallengeType : 'public'
     const hours = [1, 6, 24, 48].includes(Number(a.expirationHours)) ? Number(a.expirationHours) : 24
+    let invited: User | undefined
+    if (a.invitedUserId) {
+      invited = await getUser(t, String(a.invitedUserId), false)
+      if (invited.id === me.id) throw new AppError('Vous ne pouvez pas vous défier vous-même')
+    }
     await lockStake(t, me.id, stake)
     const c: Challenge = {
-      id: uid(), creatorId: me.id, opponentId: null, amount: stake, status: 'pending',
+      id: uid(), creatorId: me.id, opponentId: null, amount: stake, status: 'pending', invitedUserId: invited?.id ?? null,
       matchType: str(a.matchType, 'Type de match', 40), platform: str(a.platform, 'Plateforme', 20),
-      requiredLevel: int(a.requiredLevel, 'Niveau', 1, 100), challengeType: type,
+      requiredLevel: int(a.requiredLevel ?? 1, 'Niveau', 1, 100), challengeType: invited ? 'private' : type,
       expiresAt: new Date(Date.now() + hours * 3600000).toISOString(), createdAt: now(),
       chatMessages: [], matchDetails: null, dispute: null, completedAt: null,
     }
+    if (invited) await notify(t, { userId: invited.id, type: 'challenge', title: '⚔️ Tu es défié !', message: `${me.pseudo} te lance un défi de ${stake} SkillCoins.`, relatedId: c.id, priority: 'high' })
     return t.put('challenges', c)
   },
 
@@ -177,7 +183,8 @@ export const challenge = {
     if (c.status !== 'pending') throw new AppError("Ce défi n'est plus disponible")
     if (c.expiresAt && new Date(c.expiresAt).getTime() < Date.now()) throw new AppError('Ce défi a expiré')
     if (c.creatorId === me.id) throw new AppError('Vous ne pouvez pas accepter votre propre défi')
-    if (me.stats.level < c.requiredLevel) throw new AppError(`Niveau ${c.requiredLevel} requis`)
+    if (!c.invitedUserId && me.stats.level < c.requiredLevel) throw new AppError(`Niveau ${c.requiredLevel} requis`)
+    if (c.invitedUserId && c.invitedUserId !== me.id) throw new AppError('Ce défi est réservé à un autre joueur')
     if (c.challengeType === 'friends') {
       const creator = await getUser(t, c.creatorId, false)
       if (!creator.friendIds.includes(me.id) && !me.friendIds.includes(c.creatorId)) throw new AppError('Défi réservé aux amis')
@@ -209,10 +216,23 @@ export const challenge = {
     const c = await getChallenge(t, a.id)
     if (!isParticipant(c, me.id)) throw new AppError('Accès refusé', 403)
     if (c.status === 'inProgress') return c
-    if (c.status !== 'accepted' || !c.matchDetails?.creatorReady || !c.matchDetails?.opponentReady) throw new AppError('Les deux joueurs doivent être prêts')
-    let next: Challenge = { ...c, status: 'inProgress', matchDetails: withDetails(c, { matchStartedAt: now() }) }
-    next = await chat(t, next, me.id, `🎮 ${me.pseudo} lance le match !`)
-    return chat(t, next, me.id, '⚽ Le match commence ! Bonne chance aux deux joueurs !')
+    if (c.status !== 'accepted') throw new AppError("Ce match ne peut plus être lancé")
+    const saved = await t.put('challenges', { ...c, status: 'inProgress', matchDetails: withDetails(c, { matchStartedAt: now() }) })
+    const other = c.creatorId === me.id ? c.opponentId : c.creatorId
+    if (other) await notify(t, { userId: other, type: 'match', title: '⚽ Le match a commencé', message: `${me.pseudo} a indiqué que vous jouez. Déclarez le score à la fin.`, relatedId: c.id, priority: 'high' })
+    return saved
+  },
+
+  /** Code de salle eFootball partagé entre les deux joueurs. */
+  async setRoomCode(t: Tx, me: User, a: { id: unknown; code: unknown }) {
+    const c = await getChallenge(t, a.id)
+    if (!isParticipant(c, me.id)) throw new AppError('Accès refusé', 403)
+    if (c.status !== 'accepted' && c.status !== 'inProgress') throw new AppError('Le match est terminé')
+    const code = typeof a.code === 'string' ? a.code.trim().slice(0, 40) : ''
+    const saved = await t.put('challenges', { ...c, matchDetails: withDetails(c, { roomCode: code || null }) })
+    const other = c.creatorId === me.id ? c.opponentId : c.creatorId
+    if (other && code) await notify(t, { userId: other, type: 'match', title: '🔑 Code de salle', message: `${me.pseudo} a partagé le code de salle : ${code}`, relatedId: c.id, priority: 'high' })
+    return saved
   },
 
   async addScreenshot(t: Tx, me: User, a: { id: unknown; url: unknown }) {
@@ -236,7 +256,7 @@ export const challenge = {
     const cs = int(a.creatorScore, 'Score'), os = int(a.opponentScore, 'Score')
     const shot = typeof a.screenshot === 'string' && a.screenshot.startsWith('/api/images/') ? a.screenshot : null
     const reports = { ...(c.matchDetails?.reports ?? {}), [me.id]: { creatorScore: cs, opponentScore: os, screenshot: shot, at: now() } }
-    let cur = await chat(t, { ...c, matchDetails: withDetails(c, { reports }) }, me.id, `📝 ${me.pseudo} a déclaré le score : ${cs} - ${os}`)
+    let cur = await t.put('challenges', { ...c, matchDetails: withDetails(c, { reports }) })
 
     const r1 = reports[c.creatorId], r2 = reports[c.opponentId]
     if (!r1 || !r2) {
@@ -256,8 +276,10 @@ export const challenge = {
       return { state: 'disputed' as const }
     }
     if (r1.creatorScore === r1.opponentScore) {
-      cur = { ...cur, matchDetails: withDetails(cur, { reports: {} }) }
-      await chat(t, cur, me.id, '🤝 Match nul ! Rejouez une manche décisive puis déclarez à nouveau le score.')
+      await t.put('challenges', { ...cur, matchDetails: withDetails(cur, { reports: {} }) })
+      for (const id of [c.creatorId, c.opponentId]) {
+        await notify(t, { userId: id, type: 'match', title: '🤝 Match nul', message: 'Rejouez une manche décisive puis déclarez à nouveau le score.', relatedId: c.id, priority: 'high' })
+      }
       return { state: 'draw' as const }
     }
     const winnerId = r1.creatorScore > r1.opponentScore ? c.creatorId : c.opponentId
@@ -354,6 +376,7 @@ export const user = {
       pseudo: a.pseudo === undefined ? u.pseudo : str(a.pseudo, 'Pseudo', 30),
       country: a.country === undefined ? u.country : str(a.country, 'Pays', 60),
       phone, profilePhoto: photo,
+      efootballId: a.efootballId === undefined ? u.efootballId : (typeof a.efootballId === 'string' ? a.efootballId.trim().slice(0, 40) : ''),
     })
   },
   async addFriend(t: Tx, me: User, a: { friendId: unknown }) {
@@ -468,12 +491,23 @@ async function getStream(t: Tx, id: unknown) {
   return s
 }
 export const stream = {
-  async start(t: Tx, me: User, a: { challengeId: unknown }) {
-    const c = await getChallenge(t, a.challengeId, false)
-    if (!isParticipant(c, me.id)) throw new AppError('Vous ne participez pas à ce défi', 403)
-    const existing = (await t.list<Stream>('streams')).find((s) => s.status === 'live' && s.streamerId === me.id && s.challengeId === c.id)
-    if (existing) return existing
-    return t.put('streams', { id: uid(), streamerId: me.id, challengeId: c.id, viewCount: 0, status: 'live', chatMessages: [], tips: [], duration: 0, quality: 'auto', createdAt: now() } as Stream)
+  /** Publie un live : lien TikTok / YouTube / Facebook / Twitch. */
+  async start(t: Tx, me: User, a: { url: unknown; title?: unknown; challengeId?: unknown }) {
+    const raw = str(a.url, 'Lien du live', 300)
+    let url: URL
+    try { url = new URL(raw) } catch { throw new AppError('Lien invalide') }
+    if (url.protocol !== 'https:') throw new AppError('Le lien doit commencer par https://')
+    let challengeId = ''
+    if (a.challengeId) {
+      const c = await getChallenge(t, a.challengeId, false)
+      if (!isParticipant(c, me.id)) throw new AppError('Vous ne participez pas à ce défi', 403)
+      challengeId = c.id
+    }
+    for (const s of (await t.list<Stream>('streams')).filter((x) => x.status === 'live' && x.streamerId === me.id)) {
+      await t.put('streams', { ...s, status: 'ended' })
+    }
+    const title = typeof a.title === 'string' && a.title.trim() ? a.title.trim().slice(0, 80) : `Live de ${me.pseudo}`
+    return t.put('streams', { id: uid(), streamerId: me.id, challengeId, url: url.toString(), title, viewCount: 0, status: 'live', chatMessages: [], tips: [], duration: 0, quality: 'auto', createdAt: now() } as Stream)
   },
   async end(t: Tx, me: User, a: { id: unknown }) {
     const s = await getStream(t, a.id)

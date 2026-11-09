@@ -1,21 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { SnackbarProvider } from './components/ui'
 import { authService, useCurrentUser } from './services/auth'
 import { LoginScreen, OnboardingScreen, RegisterScreen, SplashScreen } from './screens/AuthScreens'
 import { MainNavigation } from './screens/MainNavigation'
-import { HomeScreen } from './screens/HomeScreen'
-import { ChallengeDetailScreen, ChallengeListScreen, CreateChallengeScreen } from './screens/ChallengeScreens'
-import { LiveMatchScreen, MatchLobbyScreen } from './screens/MatchScreens'
+import { CreateChallengeV2, DefisV2, HomeV2 } from './screens/v2/PlayScreens'
+import { MatchScreenV2 } from './screens/v2/MatchScreen'
+import { ClassementV2, LivesV2, NotificationsV2, ProfilV2, ReferralV2, TournoisV2, WalletV2 } from './screens/v2/HubScreens'
+import { ChallengeDetailScreen } from './screens/ChallengeScreens'
 import { CreateDisputeScreen, DisputeEvidenceScreen, DisputesScreen } from './screens/DisputeScreens'
-import {
-  AnnouncementsScreen, HistoryScreen, NotificationsScreen, ProfileScreen, SettingsScreen, WalletScreen,
-} from './screens/AccountScreens'
-import {
-  CreateTournamentScreen, FriendsScreen, InfluencerDashboardScreen, LeaderboardScreen, ReferralScreen,
-  TournamentDetailScreen, TournamentsScreen,
-} from './screens/SocialScreens'
-import { LiveStreamScreen, StreamListScreen, WatchStreamScreen } from './screens/StreamScreens'
+import { SettingsScreen } from './screens/AccountScreens'
+import { CreateTournamentScreen, FriendsScreen, TournamentDetailScreen } from './screens/SocialScreens'
 
 function Protected({ children }: { children: ReactNode }) {
   const user = useCurrentUser()
@@ -25,6 +20,12 @@ function Protected({ children }: { children: ReactNode }) {
 function PublicOnly({ children }: { children: ReactNode }) {
   const user = useCurrentUser()
   return user ? <Navigate to="/" replace /> : <>{children}</>
+}
+
+/** Anciennes adresses du lobby / match en direct → nouvel écran de match. */
+function MatchRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/match/${id}`} replace />
 }
 
 const P = (el: ReactNode) => <Protected>{el}</Protected>
@@ -45,34 +46,39 @@ export default function App() {
             <Route path="/login" element={<PublicOnly><LoginScreen /></PublicOnly>} />
             <Route path="/register" element={<PublicOnly><RegisterScreen /></PublicOnly>} />
 
+            {/* Onglets */}
             <Route element={P(<MainNavigation />)}>
-              <Route index element={<HomeScreen />} />
-              <Route path="/defis" element={<ChallengeListScreen />} />
-              <Route path="/historique" element={<HistoryScreen />} />
-              <Route path="/streaming" element={<StreamListScreen />} />
-              <Route path="/profil" element={<ProfileScreen />} />
+              <Route index element={<HomeV2 />} />
+              <Route path="/defis" element={<DefisV2 />} />
+              <Route path="/tournaments" element={<TournoisV2 />} />
+              <Route path="/classement" element={<ClassementV2 />} />
+              <Route path="/profil" element={<ProfilV2 />} />
             </Route>
 
-            <Route path="/challenges/create" element={P(<CreateChallengeScreen />)} />
+            {/* Pages */}
+            <Route path="/challenges/create" element={P(<CreateChallengeV2 />)} />
             <Route path="/challenges/:id" element={P(<ChallengeDetailScreen />)} />
-            <Route path="/match/:id/lobby" element={P(<MatchLobbyScreen />)} />
-            <Route path="/match/:id/live" element={P(<LiveMatchScreen />)} />
+            <Route path="/match/:id" element={P(<MatchScreenV2 />)} />
+            <Route path="/match/:id/lobby" element={<MatchRedirect />} />
+            <Route path="/match/:id/live" element={<MatchRedirect />} />
+            <Route path="/notifications" element={P(<NotificationsV2 />)} />
+            <Route path="/wallet" element={P(<WalletV2 />)} />
+            <Route path="/referral" element={P(<ReferralV2 />)} />
+            <Route path="/lives" element={P(<LivesV2 />)} />
+            <Route path="/friends" element={P(<FriendsScreen />)} />
+            <Route path="/settings" element={P(<SettingsScreen />)} />
             <Route path="/disputes" element={P(<DisputesScreen />)} />
             <Route path="/disputes/new/:id" element={P(<CreateDisputeScreen />)} />
             <Route path="/disputes/:id/evidence" element={P(<DisputeEvidenceScreen />)} />
-            <Route path="/notifications" element={P(<NotificationsScreen />)} />
-            <Route path="/announcements" element={P(<AnnouncementsScreen />)} />
-            <Route path="/wallet" element={P(<WalletScreen />)} />
-            <Route path="/settings" element={P(<SettingsScreen />)} />
-            <Route path="/tournaments" element={P(<TournamentsScreen />)} />
             <Route path="/tournaments/create" element={P(<CreateTournamentScreen />)} />
             <Route path="/tournaments/:id" element={P(<TournamentDetailScreen />)} />
-            <Route path="/leaderboard" element={P(<LeaderboardScreen />)} />
-            <Route path="/referral" element={P(<ReferralScreen />)} />
-            <Route path="/influencer" element={P(<InfluencerDashboardScreen />)} />
-            <Route path="/friends" element={P(<FriendsScreen />)} />
-            <Route path="/stream/:id/live" element={P(<LiveStreamScreen />)} />
-            <Route path="/stream/:id/watch" element={P(<WatchStreamScreen />)} />
+
+            {/* Anciennes adresses */}
+            <Route path="/historique" element={<Navigate to="/defis?tab=histo" replace />} />
+            <Route path="/leaderboard" element={<Navigate to="/classement" replace />} />
+            <Route path="/announcements" element={<Navigate to="/notifications?tab=annonces" replace />} />
+            <Route path="/influencer" element={<Navigate to="/referral" replace />} />
+            <Route path="/streaming" element={<Navigate to="/lives" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

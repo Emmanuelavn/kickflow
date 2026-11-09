@@ -40,23 +40,29 @@ export const challengeService = {
     return db.list('challenges')
       .filter((c) => c.status === 'pending' && c.creatorId !== user.id)
       .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now)
-      .filter((c) => c.challengeType === 'public' || (c.challengeType === 'friends' && user.friendIds.includes(c.creatorId)))
+      .filter((c) => c.invitedUserId ? c.invitedUserId === user.id
+        : c.challengeType === 'public' || (c.challengeType === 'friends' && user.friendIds.includes(c.creatorId)))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 100)
   },
   getMine: (userId: string) => db.list('challenges').filter((c) => isParticipant(c, userId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   getCreatedBy: (userId: string) => db.list('challenges').filter((c) => c.creatorId === userId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  /** Match en cours du joueur (accepté ou en jeu), le plus récent. */
+  getCurrentMatch(userId: string): Challenge | undefined {
+    return this.getMine(userId).find((c) => (c.status === 'accepted' || c.status === 'inProgress') && !!c.opponentId)
+  },
   getActive(userId: string) {
     return this.getMine(userId).filter((c) => ['pending', 'accepted', 'inProgress'].includes(c.status))
   },
   getDisputed: () => db.list('challenges').filter((c) => c.dispute).sort((a, b) => b.dispute!.timestamp.localeCompare(a.dispute!.timestamp)),
 
-  create: (p: { amount: number; matchType: string; platform: string; requiredLevel: number; challengeType: ChallengeType; expirationHours: number }) =>
+  create: (p: { amount: number; matchType: string; platform: string; requiredLevel?: number; challengeType: ChallengeType; expirationHours: number; invitedUserId?: string | null }) =>
     rpc<Challenge>('challenge.create', p),
   accept: (id: string) => rpc<Challenge>('challenge.accept', { id }),
   cancel: (id: string) => rpc('challenge.cancel', { id }),
   setReady: (id: string, ready: boolean) => rpc('challenge.setReady', { id, ready }),
   start: (id: string) => rpc('challenge.start', { id }),
+  setRoomCode: (id: string, code: string) => rpc('challenge.setRoomCode', { id, code }),
   addScreenshot: (id: string, url: string) => rpc('challenge.addScreenshot', { id, url }),
   sendMessage: (id: string, message: string) => rpc('challenge.sendMessage', { id, message }),
   reportScore: (id: string, creatorScore: number, opponentScore: number, screenshot?: string | null) =>
