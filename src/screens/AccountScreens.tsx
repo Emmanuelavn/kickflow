@@ -1,6 +1,7 @@
 // Transposé de history_screen, wallet_screen, notifications_screen, profile_screen, settings_screen, announcements_screen (.dart)
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { PushSetting } from '../components/PushCard'
 import { Bell, ChevronRight, CircleHelp, Coins, Globe, KeyRound, Lock, LogOut, Mail, Moon, Receipt, Shield, Trash2, User as UserIcon, Scale, type LucideIcon } from 'lucide-react'
 import { AppBar, BottomSheet, Button, Dialog, TextField, useAction, useSnack } from '../components/ui'
 import { authService, useUser } from '../services/auth'
@@ -93,7 +94,7 @@ export function SettingsScreen() {
           <ActionTile title="Devise" icon={Coins} trailing={s.currency[0]} onTap={() => setSheet('currency')} />
         </Section>
         <Section title="Notifications" icon={Bell}>
-          <Switch title="Notifications Push" subtitle="Recevoir des notifications sur votre appareil" value={s.push[0]} onChange={s.push[1]} />
+          <PushSetting />
           <Switch title="Notifications Email" subtitle="Recevoir des notifications par email" value={s.email[0]} onChange={s.email[1]} />
           <Switch title="Notifications SMS" subtitle="Recevoir des notifications par SMS" value={s.sms[0]} onChange={s.sms[1]} />
           <Switch title="Défis" subtitle="Nouveaux défis et mises à jour" value={s.challenge[0]} onChange={s.challenge[1]} />

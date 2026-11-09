@@ -49,6 +49,10 @@ async function addTx(t: Tx, userId: string, type: TransactionType, amt: number, 
 export async function notify(t: Tx, p: { userId: string; type: NotificationType; title: string; message: string; relatedId?: string | null; priority?: NotificationPriority }) {
   const n: AppNotification = { id: uid(), isRead: false, createdAt: now(), channel: 'push', priority: 'normal', relatedId: null, ...p }
   await t.put('notifications', n)
+  // Lien ouvert quand le joueur touche la notification sur son téléphone
+  const url = n.relatedId && ['challenge', 'match', 'dispute'].includes(n.type) ? `/match/${n.relatedId}`
+    : n.relatedId && n.type === 'tournament' ? `/tournaments/${n.relatedId}` : '/notifications'
+  t.pushes.push({ userId: n.userId, title: n.title, message: n.message, url })
 }
 const pseudo = async (t: Tx, id?: string | null) => (id ? (await t.get<User>('users', id))?.pseudo ?? 'Joueur' : 'Joueur')
 

@@ -18,6 +18,9 @@ Le `Dockerfile` à la racine construit et lance tout. Variables d'environnement 
 | `DATABASE_SSL` | non | `true` si la base impose une connexion chiffrée. |
 | `SIGNUP_BONUS` | non | SkillCoins offerts à l'inscription (100 par défaut). |
 | `PORT` | non | Port d'écoute (8787 par défaut ; souvent fourni par l'hébergeur). |
+| `APP_URL` | conseillé | Adresse publique (ex. `https://kickflow.wedeploy.tech`), utilisée dans les liens des emails. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | conseillé | Notifications sur le téléphone. Générer avec `npx web-push generate-vapid-keys`. Sans elles, pas de notifications. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | conseillé | Envoi des emails « mot de passe oublié ». Sans eux, les liens sont écrits dans les logs du serveur. |
 
 Au premier démarrage, les tables sont créées automatiquement, ainsi que les annonces et deux tournois d'exemple.
 Vérification : `https://votre-domaine/api/health` doit répondre `{"ok":true}`.
@@ -43,7 +46,8 @@ Profil → Mes disputes → « À arbitrer » → Trancher. La décision corrige
 
 ## Mot de passe oublié
 
-En attendant l'envoi d'emails, l'administrateur peut réinitialiser un mot de passe :
+Le joueur clique « Mot de passe oublié ? » et reçoit un lien valable 1 h (variables SMTP requises).
+Sans SMTP configuré, le lien apparaît dans les logs du serveur. L'administrateur peut aussi forcer un mot de passe :
 
 ```bash
 node --env-file=.env -e "import('./server/auth.ts').then(async m => { console.log(await m.adminResetPassword('joueur@email.com', 'nouveauMotDePasse')); process.exit() })"

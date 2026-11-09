@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import express, { type NextFunction, type Request, type Response } from 'express'
 import compression from 'compression'
 import { AppError, migrate, pool, tx, type Tx } from './db.ts'
-import { changePassword, deleteAccount, login, register, verifyToken } from './auth.ts'
+import { changePassword, deleteAccount, forgotPassword, login, register, resetPassword, verifyToken } from './auth.ts'
+import { publicKey, pushEnabled, sendPushes, subscribe, unsubscribe } from './push.ts'
 import { challenge, expirePendingChallenges, notification, stream, tournament, user, wallet } from './logic.ts'
 import { attachRealtime, broadcast, changesFor } from './realtime.ts'
 import { seed } from './seed.ts'
@@ -89,13 +90,43 @@ app.get('/api/health', wrap(async (_req, res) => {
 }))
 
 app.post('/api/auth/register', wrap(async (req, res) => {
-  const { result, changes } = await register(req.body ?? {})
+  const { result, changes, pushes } = await register(req.body ?? {})
   broadcast(changes)
+  sendPushes(pushes)
   res.json(result)
 }))
 
 app.post('/api/auth/login', wrap(async (req, res) => {
   res.json(await login(req.body ?? {}))
+}))
+
+// Mot de passe oublié : limite stricte de 5 demandes / 15 min / adresse IP
+const forgotHits = new Map<string, { n: number; reset: number }>()
+app.post('/api/auth/forgot', wrap(async (req, res) => {
+  const key = req.ip ?? 'x'
+  const h = forgotHits.get(key)
+  if (!h || h.reset < Date.now()) forgotHits.set(key, { n: 1, reset: Date.now() + 15 * 60000 })
+  else if (++h.n > 5) throw new AppError('Trop de demandes, réessayez dans 15 minutes', 429)
+  await forgotPassword(req.body ?? {}, `${req.protocol}://${req.get('host')}`)
+  res.json({ ok: true })
+}))
+
+app.post('/api/auth/reset', wrap(async (req, res) => {
+  const { result } = await resetPassword(req.body ?? {})
+  res.json(result)
+}))
+
+// Notifications sur le téléphone
+app.get('/api/push/key', (_req, res) => { res.json({ enabled: pushEnabled, key: publicKey() }) })
+app.post('/api/push/subscribe', wrap(async (req, res) => {
+  const me = await currentUser(req)
+  await subscribe(me.id, req.body?.subscription)
+  res.json({ ok: true })
+}))
+app.post('/api/push/unsubscribe', wrap(async (req, res) => {
+  const me = await currentUser(req)
+  await unsubscribe(me.id, req.body?.endpoint)
+  res.json({ ok: true })
 }))
 
 app.get('/api/me', wrap(async (req, res) => {
@@ -106,8 +137,9 @@ app.post('/api/rpc/:name', wrap(async (req, res) => {
   const handler = RPC[req.params.name]
   if (!handler) throw new AppError('Action inconnue', 404)
   const me = await currentUser(req)
-  const { result, changes } = await tx((t) => handler(t, me, req.body ?? {}))
+  const { result, changes, pushes } = await tx((t) => handler(t, me, req.body ?? {}))
   broadcast(changes)
+  sendPushes(pushes)
   res.json({ result: result ?? null, changes: changesFor(changes, { userId: me.id, isAdmin: !!me.isAdmin }) })
 }))
 
@@ -155,7 +187,7 @@ async function main() {
   server.listen(port, () => console.log(`✅ KickFlow en ligne sur le port ${port}`))
   // Toutes les minutes : les défis en attente expirés sont annulés et la mise rendue
   setInterval(() => {
-    tx(expirePendingChallenges).then(({ changes }) => broadcast(changes)).catch((e) => console.error('expiration', e))
+    tx(expirePendingChallenges).then(({ changes, pushes }) => { broadcast(changes); sendPushes(pushes) }).catch((e) => console.error('expiration', e))
   }, 60000).unref()
 }
 

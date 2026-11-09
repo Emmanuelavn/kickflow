@@ -1,9 +1,10 @@
 // Comptes : inscription / connexion par email + mot de passe (mots de passe hachés avec bcrypt), jetons JWT.
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { AppError, pool, tx, type Tx } from './db.ts'
 import { notify, str } from './logic.ts'
+import { sendMail } from './mail.ts'
 import type { Referral, User } from '../src/lib/types.ts'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? ''
@@ -129,4 +130,44 @@ export async function deleteAccount(t: Tx, me: User) {
 export async function adminResetPassword(email: string, newPassword: string) {
   const r = await pool.query('update accounts set password_hash = $2 where email = $1', [email.toLowerCase(), await bcrypt.hash(newPassword, 10)])
   return r.rowCount === 1
+}
+
+// ---------- Mot de passe oublié ----------
+const APP_URL = (process.env.APP_URL ?? '').replace(/\/$/, '')
+const hashToken = (t: string) => createHash('sha256').update(t).digest('hex')
+
+/** Envoie un lien de réinitialisation (valable 1 h). Répond pareil que l'email existe ou non. */
+export async function forgotPassword(a: Record<string, unknown>, origin: string) {
+  const email = typeof a.email === 'string' ? a.email.trim().toLowerCase() : ''
+  if (!emailOk(email)) throw new AppError('Email invalide')
+  const r = await pool.query('select user_id from accounts where email = $1', [email])
+  if (!r.rows[0]) return
+  const userId = r.rows[0].user_id as string
+  // Limite : 3 demandes par heure et par compte
+  const recent = await pool.query(`select count(*)::int as n from password_resets where user_id = $1 and expires_at > now()`, [userId])
+  if (recent.rows[0].n >= 3) return
+  const token = randomBytes(32).toString('base64url')
+  await pool.query(`insert into password_resets (token_hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [hashToken(token), userId])
+  const link = `${APP_URL || origin}/reset?token=${token}`
+  await sendMail(email, 'Réinitialise ton mot de passe KickFlow',
+    "Tu as demandé à changer ton mot de passe KickFlow.\nCe lien est valable 1 heure. Si ce n'est pas toi, ignore simplement cet email.",
+    { label: 'Choisir un nouveau mot de passe', url: link }).catch((e) => console.error('email de réinitialisation', e.message))
+}
+
+export async function resetPassword(a: Record<string, unknown>) {
+  const token = typeof a.token === 'string' ? a.token : ''
+  const password = typeof a.password === 'string' ? a.password : ''
+  if (password.length < 6) throw new AppError('Mot de passe : minimum 6 caractères')
+  if (password.length > 200) throw new AppError('Mot de passe trop long')
+  const hash = await bcrypt.hash(password, 10)
+  return tx(async (t) => {
+    const r = await t.client.query('select user_id from password_resets where token_hash = $1 and not used and expires_at > now() for update', [hashToken(token)])
+    if (!r.rows[0]) throw new AppError('Lien invalide ou expiré. Refais une demande.')
+    const userId = r.rows[0].user_id as string
+    await t.client.query('update password_resets set used = true where user_id = $1', [userId])
+    await t.client.query('update accounts set password_hash = $2 where user_id = $1', [userId, hash])
+    const u = await t.get<User>('users', userId)
+    if (!u) throw new AppError('Compte introuvable')
+    return { token: signToken(userId), user: u }
+  })
 }

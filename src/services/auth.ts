@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { db, useDb } from '../lib/db'
 import { connectRealtime, disconnectRealtime, getToken, http, rpc, setToken, setUnauthorizedHandler } from '../lib/api'
 import type { User } from '../lib/types'
+import { detachPush, syncPush } from '../lib/push'
 
 let currentUserId: string | null = null
 const listeners = new Set<() => void>()
@@ -12,8 +13,10 @@ async function startSession(token: string, user: User) {
   setToken(token)
   currentUserId = user.id
   db.apply([{ col: 'users', id: user.id, doc: user as unknown as Record<string, unknown> }])
-  await connectRealtime()
+  // Les données arrivent en direct ; on n'attend pas plus de 2,5 s pour afficher l'appli
+  await Promise.race([connectRealtime(), new Promise((r) => setTimeout(r, 2500))])
   emit()
+  void syncPush()
 }
 
 export const authService = {
@@ -53,7 +56,16 @@ export const authService = {
     await startSession(r.token, r.user)
   },
 
+  /** Envoie un email avec un lien pour choisir un nouveau mot de passe. */
+  forgotPassword: (email: string) => http('/api/auth/forgot', { email }),
+
+  async resetPassword(token: string, password: string) {
+    const r = await http<{ token: string; user: User }>('/api/auth/reset', { token, password })
+    await startSession(r.token, r.user)
+  },
+
   logout() {
+    void detachPush(getToken())
     setToken(null)
     currentUserId = null
     disconnectRealtime()

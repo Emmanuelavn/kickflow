@@ -16,7 +16,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'icons/*.png'],
       // Les appels à l'API et aux images ne doivent jamais être servis depuis le cache hors-ligne
-      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/ws/] },
+      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/ws/], importScripts: ['push-sw.js'] },
       manifest: {
         name: 'KickFlow',
         short_name: 'KickFlow',

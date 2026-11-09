@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, ChevronRight, Plus, Radio, Search, Trophy, UserPlus } from 'lucide-react'
 import { Avatar, Empty, useAction, useSnack } from '../../components/ui'
 import { ChallengeRow, Coins, Section, Seg, TopBar, minutesAgo, prizeOf } from '../../components/kit'
+import { PushCard } from '../../components/PushCard'
 import { useUser } from '../../services/auth'
 import { useDb } from '../../lib/db'
 import { challengeService, STATUS_META } from '../../services/challenges'
@@ -49,6 +50,7 @@ export function HomeV2() {
       </header>
 
       <div className="k-body">
+        <PushCard />
         {!me.efootballId && (
           <button type="button" className="k-card row" style={{ width: '100%', textAlign: 'left', marginBottom: 12, cursor: 'pointer', color: 'inherit', borderColor: 'rgba(255,214,10,.4)' }} onClick={() => navigate('/profil?edit=1')}>
             <UserPlus size={22} color="var(--yellow)" />

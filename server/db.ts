@@ -10,6 +10,8 @@ export const COLLECTIONS = [
 export type Col = (typeof COLLECTIONS)[number]
 
 export interface Change { col: Col; id: string; doc: Record<string, unknown> | null }
+/** Notification à envoyer sur le téléphone après la transaction. */
+export interface PushItem { userId: string; title: string; message: string; url: string }
 
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -34,6 +36,19 @@ export async function migrate() {
       password_hash text not null,
       created_at timestamptz not null default now()
     );
+    create table if not exists push_subscriptions (
+      endpoint text primary key,
+      user_id text not null,
+      subscription jsonb not null,
+      created_at timestamptz not null default now()
+    );
+    create index if not exists push_user_idx on push_subscriptions (user_id);
+    create table if not exists password_resets (
+      token_hash text primary key,
+      user_id text not null,
+      expires_at timestamptz not null,
+      used boolean not null default false
+    );
     create table if not exists images (
       id text primary key,
       owner text not null,
@@ -53,6 +68,7 @@ function ownerOf(col: Col, doc: Record<string, unknown>): string | null {
 
 export class Tx {
   readonly changes = new Map<string, Change>()
+  readonly pushes: PushItem[] = []
   readonly client: pg.PoolClient
   constructor(client: pg.PoolClient) {
     this.client = client
@@ -99,14 +115,14 @@ export class Tx {
 }
 
 /** Exécute une fonction dans une transaction et renvoie les documents modifiés. */
-export async function tx<T>(fn: (t: Tx) => Promise<T>): Promise<{ result: T; changes: Change[] }> {
+export async function tx<T>(fn: (t: Tx) => Promise<T>): Promise<{ result: T; changes: Change[]; pushes: PushItem[] }> {
   const client = await pool.connect()
   try {
     await client.query('begin')
     const t = new Tx(client)
     const result = await fn(t)
     await client.query('commit')
-    return { result, changes: [...t.changes.values()] }
+    return { result, changes: [...t.changes.values()], pushes: t.pushes }
   } catch (e) {
     await client.query('rollback').catch(() => {})
     throw e

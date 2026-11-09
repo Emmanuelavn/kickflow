@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, Gift, Globe, Lock, Mail, Phone, User as UserIcon, Gamepad2, Wallet, Video } from 'lucide-react'
-import { AppBar, Button, Dialog, SelectField, TextField, useSnack } from '../components/ui'
+import { AppBar, Button, SelectField, TextField, useSnack } from '../components/ui'
 import { SoccerBall } from '../components/icons'
 import { authService } from '../services/auth'
 import { COUNTRIES } from '../lib/countries'
@@ -11,7 +11,7 @@ import { COUNTRIES } from '../lib/countries'
 // ---------------- Splash ----------------
 export function SplashScreen({ onDone }: { onDone: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onDone, 2000)
+    const t = setTimeout(onDone, 600)
     return () => clearTimeout(t)
   }, [onDone])
   return (
@@ -73,7 +73,6 @@ export function LoginScreen() {
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = useState(false)
-  const [forgot, setForgot] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -105,7 +104,7 @@ export function LoginScreen() {
           <TextField label="Mot de passe" icon={Lock} password autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
         </div>
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: -8 }}>
-          <Button variant="text" onClick={() => setForgot(true)}>Mot de passe oublié ?</Button>
+          <Button variant="text" onClick={() => navigate('/forgot')}>Mot de passe oublié ?</Button>
         </div>
         <Button type="submit" block loading={loading} style={{ marginTop: 8 }}>Se connecter</Button>
         <div className="row mt-32" style={{ justifyContent: 'center', gap: 0 }}>
@@ -113,11 +112,6 @@ export function LoginScreen() {
           <Button variant="text" onClick={() => navigate('/register')}>S'inscrire</Button>
         </div>
       </form>
-      <Dialog open={forgot} onClose={() => setForgot(false)}>
-        <h3 className="headline-sm">Mot de passe oublié</h3>
-        <p className="body-md mt-12">Contactez l'administrateur de KickFlow avec l'email de votre compte : il vous donnera un nouveau mot de passe. La réinitialisation par email arrivera bientôt.</p>
-        <div className="dialog-actions"><Button sm onClick={() => setForgot(false)}>Compris</Button></div>
-      </Dialog>
     </div>
   )
 }
@@ -178,6 +172,98 @@ export function RegisterScreen() {
           <span className="body-md">Déjà inscrit ? </span>
           <Button variant="text" onClick={() => navigate('/login', { replace: true })}>Se connecter</Button>
         </div>
+      </form>
+    </div>
+  )
+}
+
+// ---------------- Mot de passe oublié ----------------
+export function ForgotPasswordScreen() {
+  const snack = useSnack()
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!email.includes('@')) return snack('Entre ton email', 'warning')
+    setLoading(true)
+    try {
+      await authService.forgotPassword(email.trim())
+      setSent(true)
+    } catch (err) {
+      snack((err as Error).message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="screen">
+      <AppBar back title="Mot de passe oublié" />
+      <form className="screen-body pad-lg" onSubmit={submit} noValidate>
+        {sent ? (
+          <div className="center-col mt-32">
+            <Mail size={56} color="var(--cyan)" />
+            <h2 className="headline-sm mt-16">Vérifie ta boîte mail</h2>
+            <p className="body-md mt-12">Si un compte existe avec <b style={{ color: '#fff' }}>{email}</b>, tu vas recevoir un lien pour choisir un nouveau mot de passe. Il est valable 1 heure.</p>
+            <p className="body-sm mt-12">Pense à regarder dans les spams.</p>
+          </div>
+        ) : (
+          <>
+            <p className="body-lg grey mt-16">Entre l'email de ton compte : on t'envoie un lien pour choisir un nouveau mot de passe.</p>
+            <div className="mt-32"><TextField label="Email" icon={Mail} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <Button type="submit" block loading={loading}>Envoyer le lien</Button>
+          </>
+        )}
+      </form>
+    </div>
+  )
+}
+
+// ---------------- Nouveau mot de passe (lien reçu par email) ----------------
+export function ResetPasswordScreen() {
+  const navigate = useNavigate()
+  const snack = useSnack()
+  const [params] = useSearchParams()
+  const token = params.get('token') ?? ''
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (pw.length < 6) return snack('Minimum 6 caractères', 'warning')
+    if (pw !== pw2) return snack('Les deux mots de passe ne correspondent pas', 'warning')
+    setLoading(true)
+    try {
+      authService.logout()
+      await authService.resetPassword(token, pw)
+      snack('Mot de passe changé, tu es connecté', 'success')
+      navigate('/', { replace: true })
+    } catch (err) {
+      snack((err as Error).message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="screen">
+      <AppBar title="Nouveau mot de passe" />
+      <form className="screen-body pad-lg" onSubmit={submit} noValidate>
+        {!token ? (
+          <p className="body-md mt-32">Ce lien est incomplet. Refais une demande depuis « Mot de passe oublié ».</p>
+        ) : (
+          <>
+            <p className="body-lg grey mt-16">Choisis ton nouveau mot de passe.</p>
+            <div className="mt-32">
+              <TextField label="Nouveau mot de passe" icon={Lock} password autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+              <TextField label="Confirmer le mot de passe" icon={Lock} password autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+            </div>
+            <Button type="submit" block loading={loading}>Changer le mot de passe</Button>
+          </>
+        )}
       </form>
     </div>
   )

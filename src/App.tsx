@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { SnackbarProvider } from './components/ui'
 import { authService, useCurrentUser } from './services/auth'
-import { LoginScreen, OnboardingScreen, RegisterScreen, SplashScreen } from './screens/AuthScreens'
+import { ForgotPasswordScreen, LoginScreen, OnboardingScreen, RegisterScreen, ResetPasswordScreen, SplashScreen } from './screens/AuthScreens'
 import { MainNavigation } from './screens/MainNavigation'
 import { CreateChallengeV2, DefisV2, HomeV2 } from './screens/v2/PlayScreens'
 import { MatchScreenV2 } from './screens/v2/MatchScreen'
@@ -45,6 +45,8 @@ export default function App() {
             <Route path="/onboarding" element={<PublicOnly><OnboardingScreen /></PublicOnly>} />
             <Route path="/login" element={<PublicOnly><LoginScreen /></PublicOnly>} />
             <Route path="/register" element={<PublicOnly><RegisterScreen /></PublicOnly>} />
+            <Route path="/forgot" element={<PublicOnly><ForgotPasswordScreen /></PublicOnly>} />
+            <Route path="/reset" element={<ResetPasswordScreen />} />
 
             {/* Onglets */}
             <Route element={P(<MainNavigation />)}>
