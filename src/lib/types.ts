@@ -84,6 +84,8 @@ export interface MatchDetails {
   reports?: Record<string, ScoreReport>
   /** Code de salle eFootball partagé par un joueur. */
   roomCode?: string | null
+  /** Joueurs ayant demandé l'annulation d'un commun accord. */
+  cancelVotes?: string[]
   /** Les gains ont déjà été versés (pour pouvoir les annuler en cas de litige). */
   paidOut?: boolean
 }

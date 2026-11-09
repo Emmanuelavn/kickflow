@@ -63,6 +63,7 @@ export const challengeService = {
   setReady: (id: string, ready: boolean) => rpc('challenge.setReady', { id, ready }),
   start: (id: string) => rpc('challenge.start', { id }),
   setRoomCode: (id: string, code: string) => rpc('challenge.setRoomCode', { id, code }),
+  agreeCancel: (id: string, withdraw = false) => rpc<{ state: 'waiting' | 'cancelled' }>('challenge.agreeCancel', { id, withdraw }),
   addScreenshot: (id: string, url: string) => rpc('challenge.addScreenshot', { id, url }),
   sendMessage: (id: string, message: string) => rpc('challenge.sendMessage', { id, message }),
   reportScore: (id: string, creatorScore: number, opponentScore: number, screenshot?: string | null) =>

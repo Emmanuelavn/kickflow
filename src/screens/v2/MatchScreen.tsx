@@ -209,6 +209,8 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
         ))}
       </div>
 
+      <CancelAgreement c={c} me={me} opp={opp} />
+
       {!accepted && !myReport && oppReport && (
         <div className="k-card row" style={{ marginTop: 12, padding: '12px 14px', gap: 10 }}>
           <Avatar name={opp.pseudo} size={32} /><span className="grow k-muted k-small">{opp.pseudo} a déjà déclaré son score</span>
@@ -216,6 +218,45 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
         </div>
       )}
     </>
+  )
+}
+
+// ----- Annulation d'un commun accord -----
+function CancelAgreement({ c, me, opp }: { c: Challenge; me: User; opp?: User }) {
+  const { run, busy } = useAction()
+  const [confirm, setConfirm] = useState(false)
+  const votes = c.matchDetails?.cancelVotes ?? []
+  const mine = votes.includes(me.id)
+  const theirs = !!opp && votes.includes(opp.id)
+  return (
+    <div className="k-card" style={{ marginTop: 16, borderStyle: 'dashed' }}>
+      {theirs && !mine ? (
+        <>
+          <p className="k-small"><b>{opp?.pseudo}</b> propose d'annuler le match : chacun récupère sa mise de {sc(c.amount)} SC.</p>
+          <div className="row" style={{ gap: 8, marginTop: 10 }}>
+            <button type="button" className="k-btn primary sm grow" disabled={busy} onClick={() => run(() => challengeService.agreeCancel(c.id), 'Match annulé, mise rendue')}>Accepter l'annulation</button>
+          </div>
+        </>
+      ) : mine ? (
+        <div className="row">
+          <span className="grow k-small k-muted">Tu as proposé d'annuler. En attente de l'accord de {opp?.pseudo}.</span>
+          <button type="button" className="k-link k-small" disabled={busy} onClick={() => run(() => challengeService.agreeCancel(c.id, true), 'Demande retirée')}>Retirer</button>
+        </div>
+      ) : (
+        <button type="button" className="k-link k-small" style={{ width: '100%', textAlign: 'center', color: 'var(--k-muted)' }} onClick={() => setConfirm(true)}>
+          Un problème ? Proposer d'annuler le match d'un commun accord
+        </button>
+      )}
+      {confirm && (
+        <div className="mt-12">
+          <p className="k-small">Si {opp?.pseudo} accepte aussi, le match est annulé et chacun récupère sa mise. Personne ne gagne ni ne perd.</p>
+          <div className="row" style={{ gap: 8, marginTop: 10 }}>
+            <button type="button" className="k-btn ghost sm grow" onClick={() => setConfirm(false)}>Non</button>
+            <button type="button" className="k-btn primary sm grow" disabled={busy} onClick={async () => { await run(() => challengeService.agreeCancel(c.id), `Demande envoyée à ${opp?.pseudo}`); setConfirm(false) }}>Proposer l'annulation</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -237,6 +278,7 @@ function Result({ c, me, opp }: { c: Challenge; me: User; opp?: User }) {
         <p className="k-muted mt-8">{c.dispute?.reason}</p>
         <p className="k-dim k-small mt-8">Un arbitre examine les photos et va trancher. Tu seras notifié.</p>
         <button type="button" className="k-btn ghost block mt-16" onClick={() => navigate(`/disputes/${c.id}/evidence`)}>Voir les preuves</button>
+        {(c.creatorId === me.id || c.opponentId === me.id) && <div style={{ textAlign: 'left' }}><CancelAgreement c={c} me={me} opp={opp} /></div>}
       </div>
     )
   }

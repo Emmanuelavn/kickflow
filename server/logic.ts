@@ -353,6 +353,51 @@ export const challenge = {
   },
 }
 
+/**
+ * Annulation d'un commun accord : quand les deux joueurs l'ont demandée, le match est annulé
+ * et chacun récupère sa mise (y compris après un résultat déjà versé, en cas de litige).
+ */
+export async function agreeCancel(t: Tx, me: User, a: { id: unknown; withdraw?: unknown }) {
+  const c = await getChallenge(t, a.id)
+  if (!isParticipant(c, me.id) || !c.opponentId) throw new AppError('Accès refusé', 403)
+  const open = c.status === 'accepted' || c.status === 'inProgress' || (c.status === 'disputed' && !c.dispute?.resolvedAt)
+  if (!open) throw new AppError('Ce match ne peut plus être annulé')
+  const votes = new Set(c.matchDetails?.cancelVotes ?? [])
+  if (a.withdraw === true) votes.delete(me.id)
+  else votes.add(me.id)
+  const other = c.creatorId === me.id ? c.opponentId : c.creatorId
+  if (!(votes.has(c.creatorId) && votes.has(c.opponentId))) {
+    const saved = await t.put('challenges', { ...c, matchDetails: withDetails(c, { cancelVotes: [...votes] }) })
+    if (a.withdraw !== true) await notify(t, { userId: other, type: 'match', title: "🤝 Demande d'annulation", message: `${me.pseudo} propose d'annuler le match et de récupérer chacun sa mise.`, relatedId: c.id, priority: 'high' })
+    return { state: 'waiting' as const, challenge: saved }
+  }
+  // Les deux sont d'accord : on rend les mises
+  const paid = !!c.matchDetails?.paidOut
+  const prev = c.matchDetails?.winnerId ?? null
+  if (paid && prev) {
+    const winnerAmount = Math.round(c.amount * 2 * (1 - COMMISSION_RATE))
+    const prevLoser = prev === c.creatorId ? c.opponentId : c.creatorId
+    await reverseWinnings(t, prev, winnerAmount, c.id)
+    await updateStats(t, prev, { wins: -1, earned: -winnerAmount })
+    await updateStats(t, prevLoser, { losses: -1, lost: -c.amount })
+    await refund(t, c.creatorId, c.amount, c.id)
+    await refund(t, c.opponentId, c.amount, c.id)
+  } else {
+    await releaseStake(t, c.creatorId, c.amount)
+    await releaseStake(t, c.opponentId, c.amount)
+  }
+  const resolution = "Match annulé d'un commun accord"
+  await t.put('challenges', {
+    ...c, status: 'cancelled', completedAt: c.completedAt ?? now(),
+    dispute: c.dispute ? { ...c.dispute, resolvedAt: now(), resolution } : null,
+    matchDetails: withDetails(c, { cancelVotes: [...votes], winnerId: null, paidOut: false }),
+  })
+  for (const id of [c.creatorId, c.opponentId]) {
+    await notify(t, { userId: id, type: 'match', title: '🤝 Match annulé', message: `${resolution} : ta mise de ${c.amount} SkillCoins t'est rendue.`, relatedId: c.id })
+  }
+  return { state: 'cancelled' as const }
+}
+
 /** Annule les défis en attente expirés et rend la mise (tâche périodique). */
 export async function expirePendingChallenges(t: Tx) {
   const list = await t.list<Challenge>('challenges')

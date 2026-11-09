@@ -8,7 +8,7 @@ import compression from 'compression'
 import { AppError, migrate, pool, tx, type Tx } from './db.ts'
 import { changePassword, deleteAccount, forgotPassword, login, register, resetPassword, verifyToken } from './auth.ts'
 import { publicKey, pushEnabled, sendPushes, subscribe, unsubscribe } from './push.ts'
-import { challenge, expirePendingChallenges, notification, stream, tournament, user, wallet } from './logic.ts'
+import { agreeCancel, challenge, expirePendingChallenges, notification, stream, tournament, user, wallet } from './logic.ts'
 import { attachRealtime, broadcast, changesFor } from './realtime.ts'
 import { seed } from './seed.ts'
 import type { User } from '../src/lib/types.ts'
@@ -26,6 +26,7 @@ const RPC: Record<string, Handler> = {
   'challenge.sendMessage': challenge.sendMessage as Handler,
   'challenge.reportScore': challenge.reportScore as Handler,
   'challenge.setRoomCode': challenge.setRoomCode as Handler,
+  'challenge.agreeCancel': agreeCancel as Handler,
   'challenge.openDispute': challenge.openDispute as Handler,
   'challenge.resolveDispute': challenge.resolveDispute as Handler,
   'user.updateProfile': user.updateProfile as Handler,
