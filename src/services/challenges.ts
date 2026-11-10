@@ -5,6 +5,7 @@ import type { Challenge, ChallengeStatus, ChallengeType, User } from '../lib/typ
 
 export const COMMISSION_RATE = 0.2
 export const DISPUTE_WINDOW_MINUTES = 5
+export const START_DEADLINE_MINUTES = 15
 
 export const STATUS_META: Record<ChallengeStatus, { label: string; short: string; color: string }> = {
   pending: { label: 'EN ATTENTE', short: 'En attente', color: 'var(--yellow)' },
@@ -63,6 +64,8 @@ export const challengeService = {
   setReady: (id: string, ready: boolean) => rpc('challenge.setReady', { id, ready }),
   start: (id: string) => rpc('challenge.start', { id }),
   setRoomCode: (id: string, code: string) => rpc('challenge.setRoomCode', { id, code }),
+  setInRoom: (id: string, inRoom: boolean) => rpc<{ state: 'waiting' | 'started' }>('challenge.setInRoom', { id, inRoom }),
+  cancelNoShow: (id: string) => rpc('challenge.cancelNoShow', { id }),
   agreeCancel: (id: string, withdraw = false) => rpc<{ state: 'waiting' | 'cancelled' }>('challenge.agreeCancel', { id, withdraw }),
   addScreenshot: (id: string, url: string) => rpc('challenge.addScreenshot', { id, url }),
   sendMessage: (id: string, message: string) => rpc('challenge.sendMessage', { id, message }),

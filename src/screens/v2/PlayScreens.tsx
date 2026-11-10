@@ -16,8 +16,13 @@ import { streamService } from '../../services/streams'
 import { sc } from '../../lib/format'
 import type { Challenge } from '../../lib/types'
 
-function stepOf(c: Challenge) {
-  if (c.status === 'accepted') return { n: 1, text: 'Retrouvez-vous sur eFootball' }
+function stepOf(c: Challenge, meId: string, oppPseudo: string) {
+  if (c.status === 'accepted') {
+    const room = c.matchDetails?.inRoom ?? []
+    if (room.includes(meId)) return { n: 1, text: `En attente de ${oppPseudo} dans la partie` }
+    if (room.length) return { n: 1, text: `${oppPseudo} t'attend dans la partie !` }
+    return { n: 1, text: 'Avant le match : rejoins la partie' }
+  }
   const mine = c.matchDetails?.reports ?? {}
   if (c.matchDetails?.lastDraw && !Object.keys(mine).length) return { n: 2, text: 'Match nul : rejouez une manche décisive' }
   return Object.keys(mine).length ? { n: 3, text: 'Déclarez le score' } : { n: 2, text: 'Jouez le match' }
@@ -35,7 +40,7 @@ export function HomeV2() {
   const tournament = tournamentService.list().find((t) => t.status !== 'completed')
   const lives = streamService.live()
   const opponent = current ? userService.getById(current.creatorId === me.id ? current.opponentId : current.creatorId) : undefined
-  const step = current ? stepOf(current) : null
+  const step = current && opponent ? stepOf(current, me.id, opponent.pseudo) : null
 
   return (
     <div className="screen with-nav">

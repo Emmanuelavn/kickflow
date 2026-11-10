@@ -89,6 +89,10 @@ export interface MatchDetails {
   /** Dernier match nul déclaré par les deux joueurs (il faut rejouer une manche décisive). */
   lastDraw?: { creatorScore: number; opponentScore: number; at: string } | null
   drawCount?: number
+  /** Moment où le défi a été accepté (départ du délai de 15 min pour commencer). */
+  acceptedAt?: string | null
+  /** Joueurs ayant confirmé « je suis dans la partie » dans eFootball. */
+  inRoom?: string[]
   /** Les gains ont déjà été versés (pour pouvoir les annuler en cas de litige). */
   paidOut?: boolean
 }

@@ -9,6 +9,23 @@ import type { Challenge, User } from '../src/lib/types.ts'
 interface Viewer { userId: string; isAdmin: boolean }
 const clients = new Map<WebSocket, Viewer>()
 
+/** Joueurs ayant l'appli ouverte (au moins une connexion temps réel). */
+function onlineIds() {
+  const ids = new Set<string>()
+  for (const [ws, v] of clients) if (ws.readyState === WebSocket.OPEN) ids.add(v.userId)
+  return [...ids]
+}
+let presenceTimer: ReturnType<typeof setTimeout> | null = null
+/** Diffuse la liste des joueurs en ligne (regroupée, au plus toutes les 2 s). */
+function broadcastPresence() {
+  if (presenceTimer) return
+  presenceTimer = setTimeout(() => {
+    presenceTimer = null
+    const msg = JSON.stringify({ type: 'presence', online: onlineIds() })
+    for (const ws of clients.keys()) if (ws.readyState === WebSocket.OPEN) ws.send(msg)
+  }, 2000)
+}
+
 /** Version d'un joueur visible par les AUTRES joueurs (sans email, téléphone, solde…). */
 function publicUser(u: User): User {
   return {
@@ -92,11 +109,13 @@ export function attachRealtime(server: Server) {
     wss.handleUpgrade(req, socket, head, async (ws) => {
       const v: Viewer = { userId, isAdmin: !!me.isAdmin }
       clients.set(ws, v)
-      ws.on('close', () => clients.delete(ws))
-      ws.on('error', () => clients.delete(ws))
+      ws.on('close', () => { clients.delete(ws); broadcastPresence() })
+      ws.on('error', () => { clients.delete(ws); broadcastPresence() })
       ws.on('message', (m) => { if (String(m) === 'ping') ws.send('pong') })
       try {
         ws.send(JSON.stringify({ type: 'snapshot', data: await snapshotFor(v) }))
+        ws.send(JSON.stringify({ type: 'presence', online: onlineIds() }))
+        broadcastPresence()
       } catch {
         ws.close()
       }

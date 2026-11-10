@@ -1,5 +1,6 @@
 // Communication avec le serveur KickFlow : appels d'API + connexion temps réel.
 import { db, type DbShape, type DocChange } from './db'
+import { presence } from './presence'
 
 const TOKEN_KEY = 'kickflow_token'
 
@@ -99,6 +100,8 @@ function open() {
       readyResolve = null
     } else if (msg.type === 'changes') {
       db.apply(msg.changes as DocChange[])
+    } else if (msg.type === 'presence') {
+      presence.set(msg.online as string[])
     }
   }
   sock.onclose = () => {
@@ -126,5 +129,6 @@ export function disconnectRealtime() {
   ws = null
   s?.close()
   setStatus('offline')
+  presence.clear()
   db.reset()
 }

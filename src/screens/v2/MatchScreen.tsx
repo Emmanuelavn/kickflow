@@ -7,7 +7,8 @@ import { ChallengeRow, TopBar, prizeOf } from '../../components/kit'
 import { useUser } from '../../services/auth'
 import { useDb } from '../../lib/db'
 import { uploadImage } from '../../lib/api'
-import { canDispute, challengeService, DISPUTE_WINDOW_MINUTES } from '../../services/challenges'
+import { canDispute, challengeService, DISPUTE_WINDOW_MINUTES, START_DEADLINE_MINUTES } from '../../services/challenges'
+import { useOnline } from '../../lib/presence'
 import { userService } from '../../services/users'
 import { readImage, sc } from '../../lib/format'
 import type { Challenge, User } from '../../lib/types'
@@ -108,15 +109,12 @@ function Waiting({ c, me }: { c: Challenge; me: User }) {
 // ----- Étapes 1 à 3 -----
 function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
   const snack = useSnack()
-  const navigate = useNavigate()
   const { run, busy } = useAction()
   const d = c.matchDetails
-  const [room, setRoom] = useState(d?.roomCode ?? '')
   const [cs, setCs] = useState('')
   const [os, setOs] = useState('')
   const [shot, setShot] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  useEffect(() => { setRoom(d?.roomCode ?? '') }, [d?.roomCode])
   // Nouveau match nul déclaré : on repart de cases vides pour la manche décisive
   useEffect(() => { if (d?.lastDraw?.at) { setCs(''); setOs(''); setShot(null) } }, [d?.lastDraw?.at])
 
@@ -148,48 +146,10 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
 
   return (
     <>
-      {/* Étape 1 */}
-      <div className={`k-step${accepted ? ' now' : ''}`}>
-        <div className="row"><span className={`k-num ${accepted ? 'now' : 'done'}`}>{accepted ? 1 : <Check size={16} />}</span><b className={`grow${accepted ? '' : ' k-muted'}`}>{accepted ? 'Retrouvez-vous sur eFootball' : 'Retrouvés sur eFootball'}</b></div>
-        {accepted && (
-          <>
-            <p className="k-muted k-small" style={{ margin: '10px 0 8px' }}>Ajoute {opp.pseudo} en ami dans eFootball avec son ID, puis lancez un match amical.</p>
-            <div className="k-field">
-              <span className="k-dim k-xs">ID eFootball</span>
-              {opp.efootballId ? (
-                <>
-                  <span className="k-mono grow k-ellipsis">{opp.efootballId}</span>
-                  <button type="button" className="k-icon" style={{ background: 'transparent', color: 'var(--cyan)' }} aria-label="Copier l'ID" onClick={() => copy(opp.efootballId!, snack, 'ID copié')}><Copy size={20} /></button>
-                </>
-              ) : <span className="grow k-dim k-small" style={{ padding: '14px 0' }}>{opp.pseudo} ne l'a pas encore renseigné : demande-le dans le chat</span>}
-            </div>
-            <label className="k-field" style={{ marginTop: 8 }}>
-              <span className="k-dim k-xs">Code de salle</span>
-              <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Optionnel, à coller ici" aria-label="Code de salle" maxLength={40} />
-              {room && room === (d?.roomCode ?? '') ? (
-                <button type="button" className="k-icon" style={{ background: 'transparent', color: 'var(--cyan)' }} aria-label="Copier le code" onClick={() => copy(room, snack, 'Code copié')}><Copy size={20} /></button>
-              ) : room.trim() ? (
-                <button type="button" className="k-btn primary sm" disabled={busy} onClick={() => run(() => challengeService.setRoomCode(c.id, room), 'Code partagé')}>Partager</button>
-              ) : null}
-            </label>
-            {!me.efootballId && (
-              <button type="button" className="k-link k-small" onClick={() => navigate('/profil?edit=1')}>Ajoute aussi ton ID eFootball pour {opp.pseudo} →</button>
-            )}
-            <button type="button" className="k-btn primary block" style={{ marginTop: 12, height: 48 }} disabled={busy}
-              onClick={() => run(() => challengeService.start(c.id), 'Bon match ! Reviens déclarer le score à la fin.')}>
-              <Check size={18} />On joue, le match a commencé
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Étape 2 */}
-      <div className="k-step">
-        <div className="row"><span className={`k-num${accepted ? '' : ' done'}`}>{accepted ? 2 : <Check size={16} />}</span><b className="grow k-muted">{accepted ? 'Jouez le match' : 'Match en cours dans eFootball'}</b></div>
-      </div>
+      {accepted ? <PreMatch c={c} me={me} opp={opp} /> : <Started c={c} />}
 
       {/* Étape 3 */}
-      <div className={`k-step${accepted ? '' : ' now'}`}>
+      {!accepted && <div className="k-step now" style={{ marginTop: 10 }}>
         <div className="row"><span className={`k-num${accepted ? '' : ' now'}`}>3</span><b className={`grow${accepted ? ' k-muted' : ''}`}>Déclarez le score final</b></div>
         {!accepted && d?.lastDraw && !myReport && (
           <div className="k-card" style={{ marginTop: 14, borderColor: 'rgba(255,169,77,.6)', background: 'rgba(255,169,77,.08)' }}>
@@ -221,7 +181,7 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
             <button type="button" className="k-btn primary block" style={{ marginTop: 14 }} disabled={busy} onClick={submit}>Valider le score</button>
           </>
         ))}
-      </div>
+      </div>}
 
       <CancelAgreement c={c} me={me} opp={opp} />
 
@@ -232,6 +192,143 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
         </div>
       )}
     </>
+  )
+}
+
+// ----- Avant le match : rôles, présence, confirmation des deux joueurs -----
+function PlayerStatus({ u, label, role, ready, online }: { u: User; label: string; role: string; ready: boolean; online: boolean }) {
+  return (
+    <div className="col" style={{ alignItems: 'center', gap: 6, flex: 1, minWidth: 0, textAlign: 'center' }}>
+      <div style={{ position: 'relative' }}>
+        <Avatar name={u.pseudo} photo={u.profilePhoto} size={52} />
+        <span title={online ? 'en ligne' : 'hors ligne'} style={{ position: 'absolute', right: 0, bottom: 2, width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--k-now)', background: online ? 'var(--k-green)' : 'var(--k-dim)' }} />
+      </div>
+      <b className="k-small k-ellipsis" style={{ maxWidth: '100%' }}>{label}</b>
+      <span className="k-dim k-xs">{role} · {online ? 'en ligne' : 'hors ligne'}</span>
+      <span className="k-pill" style={{ background: ready ? 'rgba(46,229,157,.14)' : 'var(--k-s2)', color: ready ? 'var(--k-green)' : 'var(--k-muted)' }}>{ready ? '✓ dans la partie' : '… pas encore'}</span>
+    </div>
+  )
+}
+
+function PreMatch({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
+  const snack = useSnack()
+  const navigate = useNavigate()
+  const { run, busy } = useAction()
+  const now = useNow(true)
+  const d = c.matchDetails
+  const isHost = c.creatorId === me.id
+  const host = isHost ? me : opp
+  const inRoom = d?.inRoom ?? []
+  const meIn = inRoom.includes(me.id)
+  const oppIn = inRoom.includes(opp.id)
+  const oppOnline = useOnline(opp.id)
+  const deadline = new Date(d?.acceptedAt ?? c.createdAt).getTime() + START_DEADLINE_MINUTES * 60000
+  const left = Math.max(0, Math.floor((deadline - now) / 1000))
+  const expired = left === 0
+  const clock = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`
+  const [room, setRoom] = useState(d?.roomCode ?? '')
+  useEffect(() => { setRoom(d?.roomCode ?? '') }, [d?.roomCode])
+  const [myId, setMyId] = useState('')
+
+  async function confirmIn(value: boolean) {
+    const r = await run(() => challengeService.setInRoom(c.id, value))
+    if (r?.state === 'started') snack('⚽ Le match a commencé, bon match !', 'success')
+    else if (r && value) snack(`C'est noté. Le match démarre dès que ${opp.pseudo} confirme aussi.`, 'success')
+  }
+
+  return (
+    <div className="k-step now">
+      <div className="row between">
+        <b style={{ fontSize: 17 }}>Avant le match</b>
+        <span className="k-pill" style={{ background: expired ? 'rgba(255,107,133,.16)' : 'var(--k-s2)', color: expired ? 'var(--k-red)' : 'var(--k-text)', fontSize: 14 }}>
+          <Clock size={14} />{expired ? 'Délai dépassé' : clock}
+        </span>
+      </div>
+      <p className="k-dim k-xs" style={{ margin: '4px 0 0' }}>
+        {expired ? `Le match n'a pas commencé dans les ${START_DEADLINE_MINUTES} minutes.` : `Temps restant pour commencer le match. Sinon, chacun pourra annuler et récupérer sa mise.`}
+      </p>
+
+      <div className="row" style={{ margin: '16px 0 4px', alignItems: 'flex-start' }}>
+        <PlayerStatus u={me} label="Toi" role={isHost ? 'hôte' : 'invité'} ready={meIn} online />
+        <PlayerStatus u={opp} label={opp.pseudo} role={isHost ? 'invité' : 'hôte'} ready={oppIn} online={oppOnline} />
+      </div>
+      {!oppOnline && !oppIn && <p className="k-dim k-xs" style={{ textAlign: 'center', margin: '6px 0 0' }}>{opp.pseudo} n'a pas l'appli ouverte : il a reçu une notification.</p>}
+
+      {!me.efootballId && (
+        <div className="k-card" style={{ marginTop: 14, borderColor: 'rgba(255,214,10,.5)' }}>
+          <b className="k-small">Ajoute ton ID eFootball</b>
+          <p className="k-dim k-xs" style={{ margin: '4px 0 8px' }}>{opp.pseudo} en a besoin pour t'ajouter en ami dans le jeu.</p>
+          <div className="row" style={{ gap: 8 }}>
+            <label className="k-field grow" style={{ minHeight: 44 }}><input value={myId} onChange={(e) => setMyId(e.target.value)} placeholder="Ton ID eFootball" aria-label="Ton ID eFootball" maxLength={40} style={{ height: 42 }} /></label>
+            <button type="button" className="k-btn primary sm" disabled={busy || !myId.trim()} onClick={() => run(() => userService.updateProfile({ efootballId: myId.trim() }), 'ID eFootball enregistré')}>OK</button>
+          </div>
+        </div>
+      )}
+
+      <p className="k-label" style={{ margin: '18px 0 8px', color: 'var(--cyan)' }}>{isHost ? 'Ton rôle : tu crées la partie' : 'Ton rôle : tu rejoins la partie'}</p>
+      <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 10 }} className="k-small">
+        <li>
+          {isHost ? <>Dans eFootball, ajoute <b>{opp.pseudo}</b> en ami avec son ID :</> : <>Dans eFootball, accepte la demande d'ami de <b>{host.pseudo}</b> (ou ajoute-le avec son ID) :</>}
+          <div className="k-field" style={{ marginTop: 6, minHeight: 46 }}>
+            {opp.efootballId ? (
+              <>
+                <span className="k-mono grow k-ellipsis">{opp.efootballId}</span>
+                <button type="button" className="k-icon" style={{ background: 'transparent', color: 'var(--cyan)', width: 38, height: 38 }} aria-label="Copier l'ID" onClick={() => copy(opp.efootballId!, snack, 'ID copié')}><Copy size={18} /></button>
+              </>
+            ) : <span className="grow k-dim k-xs" style={{ padding: '12px 0' }}>{opp.pseudo} n'a pas encore renseigné son ID : demande-le dans les messages.</span>}
+          </div>
+        </li>
+        <li>{isHost ? <>Va dans <b>Match amical</b>, crée la partie et <b>invite {opp.pseudo}</b>.</> : <>Attends l'<b>invitation de {host.pseudo}</b> dans eFootball et accepte-la.</>}</li>
+        <li>Quand tu es <b>dans la partie</b>, confirme ici. Le match démarre automatiquement dès que vous avez confirmé tous les deux.</li>
+      </ol>
+
+      <label className="k-field" style={{ marginTop: 14 }}>
+        <span className="k-dim k-xs">Code de salle</span>
+        <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder={isHost ? 'Optionnel' : 'Partagé par l\'hôte'} aria-label="Code de salle" maxLength={40} />
+        {room && room === (d?.roomCode ?? '') ? (
+          <button type="button" className="k-icon" style={{ background: 'transparent', color: 'var(--cyan)' }} aria-label="Copier le code" onClick={() => copy(room, snack, 'Code copié')}><Copy size={20} /></button>
+        ) : room.trim() ? (
+          <button type="button" className="k-btn primary sm" disabled={busy} onClick={() => run(() => challengeService.setRoomCode(c.id, room), 'Code partagé')}>Partager</button>
+        ) : null}
+      </label>
+
+      {meIn ? (
+        <>
+          <div className="k-card" style={{ marginTop: 14, textAlign: 'center', borderColor: 'rgba(46,229,157,.5)', background: 'rgba(46,229,157,.06)' }}>
+            <b style={{ color: 'var(--k-green)' }}>✓ Tu es dans la partie</b>
+            <p className="k-small k-muted" style={{ margin: '4px 0 0' }}>En attente de la confirmation de {opp.pseudo}…</p>
+          </div>
+          <button type="button" className="k-link k-small" style={{ width: '100%', textAlign: 'center' }} disabled={busy} onClick={() => confirmIn(false)}>Je ne suis plus dans la partie</button>
+        </>
+      ) : (
+        <button type="button" className="k-btn primary block" style={{ marginTop: 14 }} disabled={busy || !me.efootballId} onClick={() => confirmIn(true)}>
+          <Check size={20} />Je suis dans la partie
+        </button>
+      )}
+      {!me.efootballId && <p className="k-dim k-xs" style={{ textAlign: 'center', margin: '6px 0 0' }}>Ajoute d'abord ton ID eFootball ci-dessus.</p>}
+      {oppIn && !meIn && <p className="k-small" style={{ textAlign: 'center', margin: '8px 0 0', color: 'var(--k-green)' }}>{opp.pseudo} est déjà dans la partie et t'attend !</p>}
+
+      {expired && (
+        <button type="button" className="k-btn danger block" style={{ marginTop: 12 }} disabled={busy}
+          onClick={async () => { if (await run(async () => { await challengeService.cancelNoShow(c.id); return true }, 'Match annulé, ta mise est rendue')) navigate('/', { replace: true }) }}>
+          Annuler et récupérer ma mise
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Bandeau affiché dès que les deux joueurs ont confirmé. */
+function Started({ c }: { c: Challenge }) {
+  const now = useNow(true)
+  const start = c.matchDetails?.matchStartedAt ? new Date(c.matchDetails.matchStartedAt).getTime() : now
+  const sec = Math.max(0, Math.floor((now - start) / 1000))
+  return (
+    <div className="k-card" style={{ textAlign: 'center', borderColor: 'rgba(46,229,157,.55)', background: 'rgba(46,229,157,.07)' }}>
+      <b style={{ color: 'var(--k-green)', fontSize: 18 }}>⚽ Le match a commencé</b>
+      <div style={{ font: '800 40px var(--font-title)', fontVariantNumeric: 'tabular-nums', margin: '4px 0' }}>{String(Math.floor(sec / 60)).padStart(2, '0')}:{String(sec % 60).padStart(2, '0')}</div>
+      <p className="k-small k-muted" style={{ margin: 0 }}>Bon match ! Reviens ici à la fin pour déclarer le score.</p>
+    </div>
   )
 }
 

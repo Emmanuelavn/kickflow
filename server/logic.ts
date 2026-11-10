@@ -9,6 +9,7 @@ import type {
 
 export const COMMISSION_RATE = 0.2
 export const DISPUTE_WINDOW_MINUTES = 5
+export const START_DEADLINE_MINUTES = 15
 const MAX_AMOUNT = 100_000
 
 const now = () => new Date().toISOString()
@@ -194,7 +195,7 @@ export const challenge = {
       if (!creator.friendIds.includes(me.id) && !me.friendIds.includes(c.creatorId)) throw new AppError('Défi réservé aux amis')
     }
     await lockStake(t, me.id, c.amount)
-    const saved = await t.put('challenges', { ...c, opponentId: me.id, status: 'accepted', matchDetails: { ...emptyDetails(), matchCode: matchCode() } })
+    const saved = await t.put('challenges', { ...c, opponentId: me.id, status: 'accepted', matchDetails: { ...emptyDetails(), matchCode: matchCode(), acceptedAt: now(), inRoom: [] } })
     await notify(t, { userId: c.creatorId, type: 'challenge', title: '🎮 Défi accepté !', message: `${me.pseudo} a accepté votre défi de ${c.amount} SkillCoins`, relatedId: c.id, priority: 'high' })
     return saved
   },
@@ -225,6 +226,46 @@ export const challenge = {
     const other = c.creatorId === me.id ? c.opponentId : c.creatorId
     if (other) await notify(t, { userId: other, type: 'match', title: '⚽ Le match a commencé', message: `${me.pseudo} a indiqué que vous jouez. Déclarez le score à la fin.`, relatedId: c.id, priority: 'high' })
     return saved
+  },
+
+  /**
+   * Avant-match : chaque joueur confirme qu'il est dans la partie eFootball.
+   * Quand les deux ont confirmé, le match démarre automatiquement.
+   */
+  async setInRoom(t: Tx, me: User, a: { id: unknown; inRoom: unknown }) {
+    const c = await getChallenge(t, a.id)
+    if (!isParticipant(c, me.id) || !c.opponentId) throw new AppError('Accès refusé', 403)
+    if (c.status === 'inProgress') return { state: 'started' as const }
+    if (c.status !== 'accepted') throw new AppError('Ce match ne peut plus commencer')
+    const room = new Set(c.matchDetails?.inRoom ?? [])
+    if (a.inRoom === false) room.delete(me.id)
+    else room.add(me.id)
+    const other = c.creatorId === me.id ? c.opponentId : c.creatorId
+    if (room.has(c.creatorId) && room.has(c.opponentId)) {
+      await t.put('challenges', { ...c, status: 'inProgress', matchDetails: withDetails(c, { inRoom: [...room], matchStartedAt: now() }) })
+      for (const id of [c.creatorId, c.opponentId]) {
+        await notify(t, { userId: id, type: 'match', title: '⚽ Le match a commencé', message: 'Vous êtes tous les deux dans la partie. Bon match ! Déclare le score à la fin.', relatedId: c.id, priority: 'high' })
+      }
+      return { state: 'started' as const }
+    }
+    await t.put('challenges', { ...c, matchDetails: withDetails(c, { inRoom: [...room] }) })
+    if (a.inRoom !== false) await notify(t, { userId: other, type: 'match', title: '🎮 Ton adversaire est prêt', message: `${me.pseudo} est dans la partie eFootball. Rejoins-le puis confirme dans KickFlow.`, relatedId: c.id, priority: 'high' })
+    return { state: 'waiting' as const }
+  },
+
+  /** Si le match n'a pas commencé 15 min après l'acceptation, chacun peut annuler et récupérer sa mise. */
+  async cancelNoShow(t: Tx, me: User, a: { id: unknown }) {
+    const c = await getChallenge(t, a.id)
+    if (!isParticipant(c, me.id) || !c.opponentId) throw new AppError('Accès refusé', 403)
+    if (c.status !== 'accepted') throw new AppError('Le match a déjà commencé ou est terminé')
+    const since = new Date(c.matchDetails?.acceptedAt ?? c.createdAt).getTime()
+    if (Date.now() - since < START_DEADLINE_MINUTES * 60000) throw new AppError(`Attends la fin des ${START_DEADLINE_MINUTES} minutes avant d'annuler`)
+    await releaseStake(t, c.creatorId, c.amount)
+    await releaseStake(t, c.opponentId, c.amount)
+    await t.put('challenges', { ...c, status: 'cancelled', completedAt: now() })
+    const other = c.creatorId === me.id ? c.opponentId : c.creatorId
+    await notify(t, { userId: other, type: 'match', title: '⌛ Match annulé', message: `Le match n'a pas commencé à temps : ${me.pseudo} l'a annulé. Ta mise de ${c.amount} SkillCoins t'est rendue.`, relatedId: c.id })
+    await notify(t, { userId: me.id, type: 'match', title: '⌛ Match annulé', message: `Ta mise de ${c.amount} SkillCoins t'est rendue.`, relatedId: c.id })
   },
 
   /** Code de salle eFootball partagé entre les deux joueurs. */
