@@ -6,6 +6,7 @@ import { ForgotPasswordScreen, LoginScreen, OnboardingScreen, RegisterScreen, Re
 import { MainNavigation } from './screens/MainNavigation'
 import { CreateChallengeV2, DefisV2, HomeV2 } from './screens/v2/PlayScreens'
 import { MatchScreenV2 } from './screens/v2/MatchScreen'
+import { PlayerScreen } from './screens/v2/PlayerScreen'
 import { ClassementV2, LivesV2, NotificationsV2, ProfilV2, ReferralV2, TournoisV2, WalletV2 } from './screens/v2/HubScreens'
 import { ChallengeDetailScreen } from './screens/ChallengeScreens'
 import { CreateDisputeScreen, DisputeEvidenceScreen, DisputesScreen } from './screens/DisputeScreens'
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/challenges/create" element={P(<CreateChallengeV2 />)} />
             <Route path="/challenges/:id" element={P(<ChallengeDetailScreen />)} />
             <Route path="/match/:id" element={P(<MatchScreenV2 />)} />
+            <Route path="/joueur/:id" element={P(<PlayerScreen />)} />
             <Route path="/match/:id/lobby" element={<MatchRedirect />} />
             <Route path="/match/:id/live" element={<MatchRedirect />} />
             <Route path="/notifications" element={P(<NotificationsV2 />)} />

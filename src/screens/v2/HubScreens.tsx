@@ -72,6 +72,7 @@ export function TournoisV2() {
 export function ClassementV2() {
   useDb()
   const me = useUser()
+  const navigate = useNavigate()
   const [scope, setScope] = useState<'all' | 'wins' | 'friends' | 'country'>('all')
   let players: User[] = db.list('users').filter((u) => u.username !== 'compte_supprime')
   if (scope === 'friends') players = [me, ...userService.getFriends(me.id)]
@@ -99,7 +100,7 @@ export function ClassementV2() {
           <>
             <div className="row" style={{ alignItems: 'flex-end', justifyContent: 'center', gap: 10, margin: '20px 0 16px' }}>
               {order.map((i) => podium[i] && (
-                <div key={podium[i].id} className="col" style={{ alignItems: 'center', gap: 6, width: 104 }}>
+                <div key={podium[i].id} className="col" style={{ alignItems: 'center', gap: 6, width: 104, cursor: 'pointer' }} onClick={() => navigate(podium[i].id === me.id ? '/profil' : `/joueur/${podium[i].id}`)}>
                   <Avatar name={podium[i].pseudo} photo={podium[i].profilePhoto} size={i === 0 ? 54 : 44} />
                   <b className="k-small k-ellipsis" style={{ maxWidth: 100 }}>{podium[i].pseudo}</b>
                   <span className="k-dim k-xs">{value(podium[i])}</span>
@@ -110,7 +111,7 @@ export function ClassementV2() {
             {rest.length > 0 && (
               <div className="k-card k-list">
                 {rest.map((u, i) => (
-                  <div key={u.id} className="k-item"><span className="k-dim" style={{ width: 22 }}>{i + 4}</span><Avatar name={u.pseudo} photo={u.profilePhoto} size={36} /><span className="grow k-ellipsis" style={{ fontWeight: 600 }}>{u.pseudo}{u.id === me.id ? ' (toi)' : ''}</span><span className="k-muted k-small">{value(u)}</span></div>
+                  <button key={u.id} type="button" className="k-item" onClick={() => navigate(u.id === me.id ? '/profil' : `/joueur/${u.id}`)}><span className="k-dim" style={{ width: 22 }}>{i + 4}</span><Avatar name={u.pseudo} photo={u.profilePhoto} size={36} /><span className="grow k-ellipsis" style={{ fontWeight: 600 }}>{u.pseudo}{u.id === me.id ? ' (toi)' : ''}</span><span className="k-muted k-small">{value(u)}</span></button>
                 ))}
               </div>
             )}

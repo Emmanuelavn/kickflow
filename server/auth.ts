@@ -16,6 +16,8 @@ const secret = () => JWT_SECRET || 'dev-only-secret-change-me-dev-only-secret'
 // Tolérant aux erreurs de saisie : guillemets, espaces, « ; » comme séparateur, variable ADMIN_EMAIL au singulier
 const ADMIN_EMAILS = `${process.env.ADMIN_EMAILS ?? ''},${process.env.ADMIN_EMAIL ?? ''}`
   .split(/[,;\s]+/).map((e) => e.replace(/["'<>]/g, '').trim().toLowerCase()).filter((e) => e.includes('@'))
+  // Domaines réservés aux tests : n'importe qui pourrait créer ces adresses, elles ne donnent jamais le rôle d'arbitre
+  .filter((e) => !/\.(test|example|invalid|localhost)$/.test(e))
 console.log(`Arbitres configurés : ${ADMIN_EMAILS.length}`)
 const SIGNUP_BONUS = Number(process.env.SIGNUP_BONUS ?? 100)
 const DUMMY_HASH = bcrypt.hashSync('compte-inexistant', 10)

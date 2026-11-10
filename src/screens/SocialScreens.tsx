@@ -177,6 +177,7 @@ export function FriendsScreen() {
   useDb()
   const user = useUser()
   const { run } = useAction()
+  const navigate = useNavigate()
   const [tab, setTab] = useState(0)
   const [q, setQ] = useState('')
   const [removing, setRemoving] = useState<User | null>(null)
@@ -195,10 +196,10 @@ export function FriendsScreen() {
       </div>
       <div className="screen-body">
         {tab === 0 && (friends.length === 0 ? <Empty icon={Users} title="Aucun ami" text="Recherchez des joueurs pour les ajouter" /> : friends.map((f) => (
-          <div key={f.id} className="list-tile" style={{ cursor: 'default' }}>
+          <div key={f.id} className="list-tile" onClick={() => navigate(`/joueur/${f.id}`)}>
             <Avatar name={f.pseudo} photo={f.profilePhoto} size={44} />
             <div className="grow"><p className="bold">{f.pseudo}</p><p className="body-sm">Niveau {f.stats.level} • {f.stats.wins}V-{f.stats.losses}D</p></div>
-            <IconButton icon={UserMinus} label="Supprimer" color="var(--error)" onClick={() => setRemoving(f)} />
+            <span onClick={(e) => e.stopPropagation()}><IconButton icon={UserMinus} label="Supprimer" color="var(--error)" onClick={() => setRemoving(f)} /></span>
           </div>
         )))}
         {tab === 1 && (

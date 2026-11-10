@@ -280,7 +280,11 @@ export const challenge = {
       return { state: 'disputed' as const }
     }
     if (r1.creatorScore === r1.opponentScore) {
-      await t.put('challenges', { ...cur, matchDetails: withDetails(cur, { reports: {} }) })
+      await t.put('challenges', { ...cur, matchDetails: withDetails(cur, {
+        reports: {},
+        lastDraw: { creatorScore: r1.creatorScore, opponentScore: r1.opponentScore, at: now() },
+        drawCount: (cur.matchDetails?.drawCount ?? 0) + 1,
+      }) })
       for (const id of [c.creatorId, c.opponentId]) {
         await notify(t, { userId: id, type: 'match', title: '🤝 Match nul', message: 'Rejouez une manche décisive puis déclarez à nouveau le score.', relatedId: c.id, priority: 'high' })
       }

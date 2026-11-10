@@ -73,8 +73,10 @@ export function ChallengeRow({ c }: { c: Challenge }) {
 
   return (
     <div className="k-item">
-      <Avatar name={creator?.pseudo ?? '?'} photo={creator?.profilePhoto} size={44} />
-      <div className="grow">
+      <button type="button" onClick={() => navigate(`/joueur/${c.creatorId}`)} aria-label={`Profil de ${creator?.pseudo}`} style={{ all: 'unset', cursor: 'pointer' }}>
+        <Avatar name={creator?.pseudo ?? '?'} photo={creator?.profilePhoto} size={44} />
+      </button>
+      <div className="grow" style={{ minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/joueur/${c.creatorId}`)}>
         <div className="row" style={{ gap: 6 }}>
           <b className="k-ellipsis">{creator?.pseudo ?? 'Joueur'}</b>
           {c.invitedUserId ? <span className="k-pill" style={{ background: 'rgba(0,229,255,.14)', color: 'var(--cyan)' }}>pour toi</span>

@@ -19,6 +19,7 @@ import type { Challenge } from '../../lib/types'
 function stepOf(c: Challenge) {
   if (c.status === 'accepted') return { n: 1, text: 'Retrouvez-vous sur eFootball' }
   const mine = c.matchDetails?.reports ?? {}
+  if (c.matchDetails?.lastDraw && !Object.keys(mine).length) return { n: 2, text: 'Match nul : rejouez une manche décisive' }
   return Object.keys(mine).length ? { n: 3, text: 'Déclarez le score' } : { n: 2, text: 'Jouez le match' }
 }
 

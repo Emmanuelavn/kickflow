@@ -86,6 +86,9 @@ export interface MatchDetails {
   roomCode?: string | null
   /** Joueurs ayant demandé l'annulation d'un commun accord. */
   cancelVotes?: string[]
+  /** Dernier match nul déclaré par les deux joueurs (il faut rejouer une manche décisive). */
+  lastDraw?: { creatorScore: number; opponentScore: number; at: string } | null
+  drawCount?: number
   /** Les gains ont déjà été versés (pour pouvoir les annuler en cas de litige). */
   paidOut?: boolean
 }

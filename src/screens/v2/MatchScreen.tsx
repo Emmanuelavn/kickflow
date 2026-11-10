@@ -62,11 +62,16 @@ export function MatchScreenV2() {
 }
 
 function Players({ me, opp }: { me: User; opp?: User }) {
+  const navigate = useNavigate()
   return (
     <div className="row between" style={{ padding: '0 4px 14px' }}>
       <div className="row" style={{ gap: 10, minWidth: 0 }}><Avatar name={me.pseudo} photo={me.profilePhoto} size={44} /><div style={{ minWidth: 0 }}><b className="k-ellipsis" style={{ display: 'block' }}>{me.pseudo}</b><span className="k-dim k-xs">toi</span></div></div>
       <span style={{ font: '800 18px var(--font-title)', color: 'var(--k-muted)' }}>VS</span>
-      <div className="row" style={{ gap: 10, minWidth: 0 }}><div style={{ textAlign: 'right', minWidth: 0 }}><b className="k-ellipsis" style={{ display: 'block' }}>{opp?.pseudo ?? '…'}</b><span className="k-dim k-xs">{opp ? `Niv. ${opp.stats.level}` : 'en attente'}</span></div><Avatar name={opp?.pseudo ?? '?'} photo={opp?.profilePhoto} size={44} /></div>
+      <button type="button" className="row" disabled={!opp} onClick={() => opp && navigate(`/joueur/${opp.id}`)} aria-label={opp ? `Voir le profil de ${opp.pseudo}` : undefined}
+        style={{ all: 'unset', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, cursor: opp ? 'pointer' : 'default' }}>
+        <div style={{ textAlign: 'right', minWidth: 0 }}><b className="k-ellipsis" style={{ display: 'block' }}>{opp?.pseudo ?? '…'}</b><span className="k-dim k-xs">{opp ? `Niv. ${opp.stats.level} · voir le profil` : 'en attente'}</span></div>
+        <Avatar name={opp?.pseudo ?? '?'} photo={opp?.profilePhoto} size={44} />
+      </button>
     </div>
   )
 }
@@ -112,6 +117,8 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
   const [shot, setShot] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   useEffect(() => { setRoom(d?.roomCode ?? '') }, [d?.roomCode])
+  // Nouveau match nul déclaré : on repart de cases vides pour la manche décisive
+  useEffect(() => { if (d?.lastDraw?.at) { setCs(''); setOs(''); setShot(null) } }, [d?.lastDraw?.at])
 
   const accepted = c.status === 'accepted'
   const myReport = d?.reports?.[me.id]
@@ -184,6 +191,13 @@ function Steps({ c, me, opp }: { c: Challenge; me: User; opp: User }) {
       {/* Étape 3 */}
       <div className={`k-step${accepted ? '' : ' now'}`}>
         <div className="row"><span className={`k-num${accepted ? '' : ' now'}`}>3</span><b className={`grow${accepted ? ' k-muted' : ''}`}>Déclarez le score final</b></div>
+        {!accepted && d?.lastDraw && !myReport && (
+          <div className="k-card" style={{ marginTop: 14, borderColor: 'rgba(255,169,77,.6)', background: 'rgba(255,169,77,.08)' }}>
+            <b style={{ color: 'var(--k-orange)' }}>🤝 Match nul {isCreator ? d.lastDraw.creatorScore : d.lastDraw.opponentScore} – {isCreator ? d.lastDraw.opponentScore : d.lastDraw.creatorScore}{(d.drawCount ?? 1) > 1 ? ` (${d.drawCount}e fois)` : ''}</b>
+            <p className="k-small" style={{ margin: '6px 0 0' }}>Un défi doit avoir un vainqueur. Rejouez une <b>manche décisive</b> dans eFootball (ou un match avec prolongations et tirs au but), puis déclarez ici le score de cette manche.</p>
+            <p className="k-dim k-xs" style={{ margin: '6px 0 0' }}>Vous ne voulez pas rejouer ? Proposez plutôt l'annulation d'un commun accord plus bas : chacun récupère sa mise.</p>
+          </div>
+        )}
         {!accepted && (myReport ? (
           <div className="mt-16" style={{ textAlign: 'center' }}>
             <p>Tu as déclaré <b>{isCreator ? myReport.creatorScore : myReport.opponentScore} – {isCreator ? myReport.opponentScore : myReport.creatorScore}</b></p>
@@ -315,11 +329,16 @@ function Result({ c, me, opp }: { c: Challenge; me: User; opp?: User }) {
 
 // ----- Chat (messages des joueurs uniquement) -----
 const SYSTEM = /^(✅ .* est prêt|⏸️ .* n'est plus prêt|🎮 .* lance le match|⚽ Le match commence|📝 .* a déclaré le score|🤝 Match nul)/
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 function Chat({ c, me }: { c: Challenge; me: User }) {
   const snack = useSnack()
+  const navigate = useNavigate()
   const [text, setText] = useState('')
-  const [open, setOpen] = useState(false)
   const msgs = c.chatMessages.filter((m) => !SYSTEM.test(m.message))
+  const [open, setOpen] = useState(msgs.length > 0)
+  const oppId = c.creatorId === me.id ? c.opponentId : c.creatorId
+  const opp = userService.getById(oppId)
+  const last = msgs[msgs.length - 1]
   const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }) }, [msgs.length, open])
   async function send() {
@@ -330,18 +349,43 @@ function Chat({ c, me }: { c: Challenge; me: User }) {
   }
   return (
     <div style={{ padding: '8px 20px calc(16px + var(--safe-bottom))', borderTop: '1px solid var(--k-line)', background: 'var(--dark-navy)', position: 'sticky', bottom: 0 }}>
-      <button type="button" className="row" style={{ all: 'unset', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 0' }} onClick={() => setOpen(!open)}>
-        <MessageCircle size={16} /><b className="k-small">Messages{msgs.length ? ` (${msgs.length})` : ''}</b><span className="k-dim k-xs">{open ? 'masquer' : 'afficher'}</span>
+      <button type="button" className="row" style={{ all: 'unset', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 0', width: '100%' }} onClick={() => setOpen(!open)}>
+        <MessageCircle size={16} />
+        <b className="k-small">Messages avec {opp?.pseudo ?? 'ton adversaire'}</b>
+        <span className="grow" />
+        <span className="k-dim k-xs">{open ? 'masquer' : msgs.length ? `${msgs.length} · afficher` : 'afficher'}</span>
       </button>
+      {!open && last && (
+        <p className="k-small k-ellipsis" style={{ margin: '0 0 8px', color: 'var(--k-muted)' }}>
+          <b style={{ color: last.senderId === me.id ? 'var(--cyan)' : 'var(--k-text)' }}>{last.senderId === me.id ? 'Toi' : opp?.pseudo}</b> : {last.message}
+        </p>
+      )}
       {open && (
-        <div ref={listRef} className="col" style={{ gap: 6, maxHeight: 200, overflowY: 'auto', margin: '6px 0 8px' }}>
-          {msgs.length === 0 && <p className="k-dim k-small">Aucun message. Écris à ton adversaire pour vous retrouver.</p>}
-          {msgs.map((m, i) => <span key={i} className={`k-msg ${m.senderId === me.id ? 'me' : 'them'}`}>{m.message}</span>)}
+        <div ref={listRef} className="col" style={{ gap: 2, maxHeight: 240, overflowY: 'auto', margin: '6px 0 8px' }}>
+          {msgs.length === 0 && <p className="k-dim k-small">Aucun message. Écris à {opp?.pseudo ?? 'ton adversaire'} pour vous retrouver dans eFootball.</p>}
+          {msgs.map((m, i) => {
+            const mine = m.senderId === me.id
+            const sender = mine ? me : userService.getById(m.senderId)
+            const firstOfGroup = i === 0 || msgs[i - 1].senderId !== m.senderId
+            const lastOfGroup = i === msgs.length - 1 || msgs[i + 1].senderId !== m.senderId
+            return (
+              <div key={i} className="row" style={{ alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start', marginTop: firstOfGroup ? 8 : 0 }}>
+                {!mine && (lastOfGroup
+                  ? <button type="button" onClick={() => navigate(`/joueur/${m.senderId}`)} aria-label={`Profil de ${sender?.pseudo}`} style={{ all: 'unset', cursor: 'pointer' }}><Avatar name={sender?.pseudo ?? '?'} photo={sender?.profilePhoto} size={28} /></button>
+                  : <span style={{ width: 28, flex: 'none' }} />)}
+                <div className="col" style={{ alignItems: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
+                  {firstOfGroup && <span className="k-xs" style={{ color: mine ? 'var(--cyan)' : 'var(--k-muted)', fontWeight: 600, margin: '0 4px 2px' }}>{mine ? 'Toi' : sender?.pseudo ?? 'Joueur'}</span>}
+                  <span className={`k-msg ${mine ? 'me' : 'them'}`} style={{ maxWidth: '100%' }}>{m.message}</span>
+                  {lastOfGroup && <span className="k-dim" style={{ fontSize: 11, margin: '2px 4px 0' }}>{hhmm(m.timestamp)}</span>}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
       <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); send() }}>
         <label className="k-field grow" style={{ minHeight: 44, borderRadius: 22 }}>
-          <input value={text} onChange={(e) => setText(e.target.value)} onFocus={() => setOpen(true)} placeholder="Écrire un message…" aria-label="Message" maxLength={500} style={{ height: 42 }} />
+          <input value={text} onChange={(e) => setText(e.target.value)} onFocus={() => setOpen(true)} placeholder={`Écrire à ${opp?.pseudo ?? 'ton adversaire'}…`} aria-label="Message" maxLength={500} style={{ height: 42 }} />
         </label>
         <button type="submit" className="k-icon primary" aria-label="Envoyer"><Send size={20} /></button>
       </form>
