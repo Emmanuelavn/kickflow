@@ -28,6 +28,12 @@ function paymentAmount(value: unknown) {
   return amount
 }
 
+function paymentPhone(value: unknown) {
+  const phone = String(value ?? '').replace(/\D/g, '')
+  if (phone.length < 8 || phone.length > 15) throw new AppError('Ajoute un numéro Mobile Money valide à ton profil.')
+  return phone
+}
+
 function signatureFor(id: string) {
   return createHmac('sha256', requiredEnv('JWT_SECRET')).update(`payplus:${id}`).digest('hex')
 }
@@ -167,6 +173,7 @@ async function settle(id: string, state: Exclude<PaymentState, 'pending'>) {
 
 export async function startDeposit(me: User, rawAmount: unknown) {
   const amount = paymentAmount(rawAmount)
+  const phone = paymentPhone(me.phone)
   const id = await createIntent(me, amount, 'deposit')
   const callback = callbackUrl(id)
   const response = await gatewayRequest('/pay/v01/redirect/checkout-invoice/create', {
@@ -178,7 +185,7 @@ export async function startDeposit(me: User, rawAmount: unknown) {
             total_amount: amount,
             devise: 'XOF',
             description: `Recharge KickFlow ${id}`,
-            customer: me.phone ?? '',
+            customer: phone,
             customer_firstname: me.username ?? '',
             customer_lastname: '',
             customer_email: me.email ?? '',
@@ -210,8 +217,7 @@ export async function startDeposit(me: User, rawAmount: unknown) {
 
 export async function startWithdrawal(me: User, rawAmount: unknown) {
   const amount = paymentAmount(rawAmount)
-  const phone = String(me.phone ?? '').replace(/[^\d]/g, '')
-  if (phone.length < 8 || phone.length > 15) throw new AppError('Ajoute un numéro Mobile Money valide à ton profil.')
+  const phone = paymentPhone(me.phone)
   const id = await createIntent(me, amount, 'withdraw')
   const callback = callbackUrl(id)
   const response = await gatewayRequest('/pay/v01/straight/payout', {
