@@ -69,6 +69,12 @@ async function gatewayRequest(path: string, init?: RequestInit) {
   return data
 }
 
+function refusalMessage(response: Record<string, unknown>, action: string) {
+  const description = typeof response.description === 'string' ? response.description.trim() : ''
+  const code = String(response.response_code ?? '').trim()
+  return description || `PayPlus a refusé ${action}${code ? ` (code ${code})` : ''}.`
+}
+
 async function createIntent(me: User, amount: number, kind: PaymentKind) {
   const id = randomUUID()
   const timestamp = new Date().toISOString()
@@ -191,7 +197,7 @@ export async function startDeposit(me: User, rawAmount: unknown) {
   })
   if (String(response.response_code) !== '00') {
     await settle(id, 'failed')
-    throw new AppError(typeof response.description === 'string' ? response.description : 'PayPlus a refusé le paiement.', 502)
+    throw new AppError(refusalMessage(response, 'le paiement'), 502)
   }
   const checkoutUrl = typeof response.response_text === 'string' ? new URL(response.response_text) : null
   if (!response.token || !checkoutUrl || checkoutUrl.protocol !== 'https:') {
@@ -224,7 +230,7 @@ export async function startWithdrawal(me: User, rawAmount: unknown) {
   })
   if (String(response.response_code) !== '00') {
     await settle(id, 'failed')
-    throw new AppError(typeof response.description === 'string' ? response.description : 'PayPlus a refusé le retrait.', 502)
+    throw new AppError(refusalMessage(response, 'le retrait'), 502)
   }
   if (!response.token) {
     // PayPlus a pu accepter l'ordre : garder les fonds réservés en attendant une vérification.
