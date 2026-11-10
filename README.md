@@ -16,9 +16,10 @@ Le `Dockerfile` à la racine construit et lance tout. Variables d'environnement 
 | `JWT_SECRET` | oui | Clé secrète des sessions, 48 caractères aléatoires minimum (celle du `.env` local convient). |
 | `ADMIN_EMAILS` | conseillé | Emails des arbitres, séparés par des virgules. |
 | `DATABASE_SSL` | non | `true` si la base impose une connexion chiffrée. |
-| `SIGNUP_BONUS` | non | SkillCoins offerts à l'inscription (100 par défaut). |
+| `SIGNUP_BONUS` | non | XOF offerts à l'inscription (100 par défaut). |
 | `PORT` | non | Port d'écoute (8787 par défaut ; souvent fourni par l'hébergeur). |
 | `APP_URL` | conseillé | Adresse publique (ex. `https://kickflow.wedeploy.tech`), utilisée dans les liens des emails. |
+| `PAYPLUS_BASE_URL`, `PAYPLUS_API_KEY`, `PAYPLUS_API_TOKEN` | requis pour les paiements | Identifiants PayPlus. Garder la clé et le jeton secrets ; les définir aussi dans l'environnement de production. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | conseillé | Notifications sur le téléphone. Générer avec `npx web-push generate-vapid-keys`. Sans elles, pas de notifications. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | conseillé | Envoi des emails « mot de passe oublié ». Sans eux, les liens sont écrits dans les logs du serveur. |
 
@@ -42,7 +43,7 @@ Tester sur un téléphone du même Wi-Fi : `npm run dev -- --host`, puis ouvrir 
 ## Arbitres
 
 Un compte dont l'email figure dans `ADMIN_EMAILS` devient arbitre à sa prochaine connexion :
-Profil → Mes disputes → « À arbitrer » → Trancher. La décision corrige automatiquement les SkillCoins.
+Profil → Mes disputes → « À arbitrer » → Trancher. La décision corrige automatiquement les XOF.
 
 ## Mot de passe oublié
 
@@ -61,7 +62,7 @@ node --env-file=.env -e "import('./server/auth.ts').then(async m => { console.lo
   sinon un litige s'ouvre automatiquement. Le perdant a 5 minutes pour contester.
 - **Sécurité** : toutes les règles s'exécutent sur le serveur dans des transactions verrouillées ; un joueur ne voit
   jamais l'email, le téléphone, le solde, les transactions ni le chat des autres.
-- **SkillCoins** : fictifs. Aucun argent réel n'est échangé.
+- **Portefeuille XOF** : les montants sont directement en francs CFA BCEAO. Les dépôts et retraits passent par PayPlus ; un dépôt n'est crédité qu'après confirmation du fournisseur.
 - **Streaming** : le streamer voit sa caméra ; la vidéo vers les spectateurs reste simulée.
 
 ## Structure

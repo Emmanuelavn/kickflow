@@ -87,7 +87,7 @@ export async function register(a: Record<string, unknown>) {
       await t.put('referrals', r)
       await notify(t, { userId: referrer.id, type: 'referral', title: '🎁 Nouveau filleul', message: `${pseudo} s'est inscrit avec votre code !`, relatedId: id })
     }
-    await notify(t, { userId: id, type: 'progression', title: '🎮 Bienvenue sur KickFlow !', message: `Vous recevez ${SIGNUP_BONUS} SkillCoins pour vos premiers défis.` })
+    await notify(t, { userId: id, type: 'progression', title: '🎮 Bienvenue sur KickFlow !', message: `Vous recevez ${SIGNUP_BONUS} XOF pour vos premiers défis.` })
     return { token: signToken(id), user: u }
   })
 }

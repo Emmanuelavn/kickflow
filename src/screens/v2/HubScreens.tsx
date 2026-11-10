@@ -1,5 +1,5 @@
 // Tournois, Classement, Notifications + annonces, Portefeuille, Parrainage, Lives, Profil (maquette v2, écrans 6, 8, 10–14)
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowDown, ArrowUp, BellOff, ChevronRight, CircleDollarSign, Clock, Copy, Edit3, Gift, History, Megaphone, Plus, Radio,
@@ -49,15 +49,15 @@ export function TournoisV2() {
               <div className="k-muted k-small">{t.type === 'singleElimination' ? 'Élimination directe' : 'Double élimination'}{joined ? ' · tu es inscrit' : ''}</div>
               <div className="row k-small" style={{ marginTop: 12, gap: 14, flexWrap: 'wrap' }}>
                 <span className="row" style={{ gap: 6 }}><Users size={16} color="var(--cyan)" />{t.participants.length}/{t.maxPlayers}</span>
-                <span className="row" style={{ gap: 6 }}><CircleDollarSign size={16} color="var(--yellow)" />{sc(t.entryFee)} SC l'entrée</span>
-                <span className="row" style={{ gap: 6 }}><Trophy size={16} color="var(--yellow)" />{t.status === 'registration' ? `jusqu'à ${sc(t.entryFee * t.maxPlayers * 0.8)}` : sc(p.prizePool)} SC à gagner</span>
+                <span className="row" style={{ gap: 6 }}><CircleDollarSign size={16} color="var(--yellow)" />{sc(t.entryFee)} XOF l'entrée</span>
+                <span className="row" style={{ gap: 6 }}><Trophy size={16} color="var(--yellow)" />{t.status === 'registration' ? `jusqu'à ${sc(t.entryFee * t.maxPlayers * 0.8)}` : sc(p.prizePool)} XOF à gagner</span>
               </div>
               {t.status === 'registration' && <div className="k-progress" style={{ marginTop: 12 }}><span style={{ width: `${(t.participants.length / t.maxPlayers) * 100}%`, background: '#A98BFF' }} /></div>}
               {myMatch && <div className="k-small" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--k-s2)' }}>Ton prochain match : <b>{userService.getById(myMatch.player1Id)?.pseudo} vs {userService.getById(myMatch.player2Id)?.pseudo}</b></div>}
               <div className="row" style={{ marginTop: 14, gap: 8 }}>
                 <button type="button" className="k-btn ghost sm grow" onClick={() => navigate(`/tournaments/${t.id}`)}>{t.status === 'registration' ? 'Détails' : 'Voir le tableau'}</button>
                 {t.status === 'registration' && !joined && (
-                  <button type="button" className="k-btn primary sm grow" disabled={full || busy} onClick={() => run(() => tournamentService.join(t.id), 'Inscription réussie !')}>{full ? 'Complet' : `S'inscrire · ${sc(t.entryFee)} SC`}</button>
+                  <button type="button" className="k-btn primary sm grow" disabled={full || busy} onClick={() => run(() => tournamentService.join(t.id), 'Inscription réussie !')}>{full ? 'Complet' : `S'inscrire · ${sc(t.entryFee)} XOF`}</button>
                 )}
               </div>
             </div>
@@ -82,7 +82,7 @@ export function ClassementV2() {
   const myRank = players.findIndex((u) => u.id === me.id) + 1
   const podium = players.slice(0, 3)
   const rest = players.slice(3, 20)
-  const value = (u: User) => (scope === 'wins' ? `${u.stats.wins} V` : `${sc(u.stats.totalEarned)} SC`)
+  const value = (u: User) => (scope === 'wins' ? `${u.stats.wins} V` : `${sc(u.stats.totalEarned)} XOF`)
   const order = [1, 0, 2]
   const heights = [100, 70, 52]
   const colors = ['var(--yellow)', '#C9D1DA', '#D9A27A']
@@ -215,16 +215,39 @@ export function NotificationsV2() {
 export function WalletV2() {
   useDb()
   const me = useUser()
+  const snack = useSnack()
+  const [params, setParams] = useSearchParams()
   const { run, busy } = useAction()
   const [dialog, setDialog] = useState<'deposit' | 'withdraw' | null>(null)
   const [amount, setAmount] = useState('')
   const b = me.walletBalance
   const txs = walletService.getTransactions(me.id)
 
+  useEffect(() => {
+    const payment = params.get('payment')
+    if (!payment) return
+    if (payment === 'completed') snack('Paiement PayPlus confirmé : portefeuille crédité.', 'success')
+    else if (payment === 'pending') snack('Paiement en attente de confirmation PayPlus.', 'warning')
+    else snack('Le paiement PayPlus n’a pas abouti.', 'error')
+    setParams((previous) => {
+      const next = new URLSearchParams(previous)
+      next.delete('payment')
+      return next
+    }, { replace: true })
+  }, [params, setParams, snack])
+
   async function confirm() {
     const n = Math.round(Number(amount))
     if (!n || n <= 0) return
-    const ok = await run(async () => { await (dialog === 'deposit' ? walletService.deposit(n) : walletService.withdraw(n)); return true }, dialog === 'deposit' ? 'SkillCoins chargés' : 'Retrait demandé')
+    const ok = await run(async () => {
+      if (dialog === 'deposit') {
+        const payment = await walletService.deposit(n)
+        window.location.assign(payment.checkoutUrl)
+        return true
+      }
+      await walletService.withdraw(n)
+      return true
+    }, dialog === 'deposit' ? 'Redirection vers PayPlus…' : 'Retrait envoyé à PayPlus')
     if (ok) { setDialog(null); setAmount('') }
   }
 
@@ -234,7 +257,7 @@ export function WalletV2() {
       <div className="k-body">
         <div className="k-card" style={{ background: 'linear-gradient(135deg, #3A2E06, #1A2739)', borderColor: '#5A4A12' }}>
           <p className="k-label" style={{ color: 'var(--yellow)' }}>Disponible pour jouer</p>
-          <div style={{ font: '800 40px var(--font-title)', marginTop: 4 }}>{sc(b.available)} <span style={{ fontSize: 18, color: 'var(--yellow)' }}>SC</span></div>
+          <div style={{ font: '800 40px var(--font-title)', marginTop: 4 }}>{sc(b.available)} <span style={{ fontSize: 18, color: 'var(--yellow)' }}>XOF</span></div>
           <div className="row k-small" style={{ marginTop: 10, gap: 18, flexWrap: 'wrap' }}>
             <span className="k-muted">En jeu : <b style={{ color: 'var(--k-text)' }}>{sc(b.pending)}</b></span>
             <span className="k-muted">Gains retirables : <b style={{ color: 'var(--k-text)' }}>{sc(b.withdrawable)}</b></span>
@@ -244,7 +267,6 @@ export function WalletV2() {
             <button type="button" className="k-btn ghost sm grow" onClick={() => setDialog('withdraw')}>Retirer</button>
           </div>
         </div>
-        <p className="k-dim k-xs" style={{ margin: '8px 4px 0' }}>SkillCoins fictifs pendant le pilote : aucun argent réel n'est échangé.</p>
         <Section title="Mouvements" />
         {txs.length === 0 ? <Empty icon={Wallet} title="Aucun mouvement" /> : (
           <div className="k-card k-list">
@@ -263,9 +285,9 @@ export function WalletV2() {
         )}
       </div>
       <Dialog open={!!dialog} onClose={() => setDialog(null)}>
-        <h3 className="headline-sm">{dialog === 'deposit' ? 'Charger des SkillCoins' : 'Retirer des gains'}</h3>
-        <div className="mt-16"><TextField label="Montant (SC)" icon={CircleDollarSign} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} autoFocus /></div>
-        {dialog === 'withdraw' && <p className="body-sm">Retirable : {sc(b.withdrawable)} SC</p>}
+        <h3 className="headline-sm">{dialog === 'deposit' ? 'Recharger le portefeuille' : 'Retirer des gains'}</h3>
+        <div className="mt-16"><TextField label="Montant (XOF)" icon={CircleDollarSign} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} autoFocus /></div>
+        {dialog === 'withdraw' && <p className="body-sm">Retirable : {sc(b.withdrawable)} XOF</p>}
         <div className="dialog-actions">
           <button type="button" className="k-btn ghost sm" onClick={() => setDialog(null)}>Annuler</button>
           <button type="button" className="k-btn primary sm" disabled={busy} onClick={confirm}>{dialog === 'deposit' ? 'Charger' : 'Retirer'}</button>
@@ -309,7 +331,7 @@ export function ReferralV2() {
         <div className="row" style={{ gap: 10, marginTop: 12 }}>
           <div className="k-card k-stat"><b>{referred.length}</b><span className="k-dim k-xs">Filleuls</span></div>
           <div className="k-card k-stat" style={{ marginTop: 0 }}><b>{active.length}</b><span className="k-dim k-xs">Actifs</span></div>
-          <div className="k-card k-stat" style={{ marginTop: 0 }}><b className="yellow">{sc(earned)}</b><span className="k-dim k-xs">SC gagnés</span></div>
+          <div className="k-card k-stat" style={{ marginTop: 0 }}><b className="yellow">{sc(earned)}</b><span className="k-dim k-xs">XOF gagnés</span></div>
         </div>
         <div className="k-card">
           <div className="row between"><b>Palier {tier.label}</b><span className="k-dim k-small">{next ? `${next.min - referred.length} filleul(s) avant ${next.label}` : 'Palier maximum'}</span></div>
@@ -420,7 +442,7 @@ export function ProfilV2() {
         </div>
         <button type="button" className="k-card row" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }} onClick={() => navigate('/wallet')}>
           <Wallet size={22} color="var(--yellow)" />
-          <span className="grow"><b style={{ display: 'block' }}>{sc(me.walletBalance.available)} SkillCoins</b><span className="k-dim k-xs">{sc(me.walletBalance.pending)} en jeu · {sc(me.walletBalance.withdrawable)} de gains</span></span>
+          <span className="grow"><b style={{ display: 'block' }}>{sc(me.walletBalance.available)} XOF</b><span className="k-dim k-xs">{sc(me.walletBalance.pending)} en jeu · {sc(me.walletBalance.withdrawable)} de gains</span></span>
           <ChevronRight size={18} className="k-dim" />
         </button>
         <div className="k-card k-list">

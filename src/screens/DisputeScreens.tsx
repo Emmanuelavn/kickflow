@@ -68,7 +68,7 @@ export function CreateDisputeScreen() {
       <div className="screen-body">
         <div className="card row between">
           <span className="title-md">Match #{c.id.slice(0, 8)}</span>
-          <span className="bold yellow">{sc(c.amount)} SC</span>
+          <span className="bold yellow">{sc(c.amount)} XOF</span>
         </div>
         {!allowed && <p className="card mt-16" style={{ color: 'var(--warning)' }}>Le délai de 5 minutes pour contester ce match est dépassé, ou un litige existe déjà.</p>}
 
@@ -161,7 +161,7 @@ function DisputeCard({ c, arbitrage, onEvidence }: { c: Challenge; arbitrage: bo
     <div className="card mb-16" style={{ border: `1px solid ${resolved ? 'var(--success)' : 'var(--orange)'}` }}>
       <div className="row between">
         <span className="pill" style={{ background: resolved ? 'rgba(0,255,135,.15)' : 'rgba(255,107,53,.2)', color: resolved ? 'var(--success)' : 'var(--orange)' }}>{resolved ? 'RÉSOLUE' : 'EN COURS'}</span>
-        <span className="bold yellow">{sc(c.amount)} SC</span>
+        <span className="bold yellow">{sc(c.amount)} XOF</span>
       </div>
       <p className="title-md mt-12">Match #{c.id.slice(0, 8)}</p>
       <p className="body-sm">{creator?.pseudo} vs {opponent?.pseudo} · {STATUS_META[c.status].short}</p>
@@ -180,7 +180,7 @@ function DisputeCard({ c, arbitrage, onEvidence }: { c: Challenge; arbitrage: bo
 
       <Dialog open={deciding} onClose={() => setDeciding(false)}>
         <h3 className="headline-sm">Décision de l'arbitre</h3>
-        <p className="body-md mt-8">Qui a gagné ce match ? Les SkillCoins seront versés ou corrigés automatiquement.</p>
+        <p className="body-md mt-8">Qui a gagné ce match ? Les XOF seront versés ou corrigés automatiquement.</p>
         <TextArea label="Note (optionnelle)" value={note} onChange={setNote} rows={2} />
         <Button disabled={busy} block onClick={() => decide(c.creatorId, `Victoire attribuée à ${creator?.pseudo}`)}>🏆 {creator?.pseudo} a gagné</Button>
         <Button disabled={busy} block style={{ marginTop: 8 }} onClick={() => decide(c.opponentId!, `Victoire attribuée à ${opponent?.pseudo}`)}>🏆 {opponent?.pseudo} a gagné</Button>
@@ -216,7 +216,7 @@ export function DisputeEvidenceScreen() {
       <div className="screen-body">
         <div className="card">
           <p className="title-md">Informations du Match</p>
-          {[['Match ID', c.id.slice(0, 8)], ['Montant', `${sc(c.amount)} SC`], ['Statut', c.status.toUpperCase()], ...(c.matchDetails?.matchCode ? [['Code Match', c.matchDetails.matchCode]] : [])].map(([k, v]) => (
+          {[['Match ID', c.id.slice(0, 8)], ['Montant', `${sc(c.amount)} XOF`], ['Statut', c.status.toUpperCase()], ...(c.matchDetails?.matchCode ? [['Code Match', c.matchDetails.matchCode]] : [])].map(([k, v]) => (
             <p key={k} className="row between mt-8"><span className="grey">{k}</span><span className="bold">{v}</span></p>
           ))}
         </div>

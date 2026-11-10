@@ -41,7 +41,7 @@ export function CreateTournamentScreen() {
       <div className="screen-body">
         <TextField label="Nom du tournoi" icon={Trophy} value={name} onChange={(e) => setName(e.target.value)} error={errors.name} />
         <TextArea label="Description (optionnel)" value={description} onChange={setDescription} rows={3} />
-        <TextField label="Frais d'inscription (SC)" icon={Coins} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} error={errors.fee} />
+        <TextField label="Frais d'inscription (XOF)" icon={Coins} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} error={errors.fee} />
         <p className="title-md mb-8">Nombre de joueurs</p>
         <div className="row gap-8 mb-16">
           {[4, 8, 16, 32].map((n) => <button key={n} type="button" className={`chip${maxPlayers === n ? ' selected' : ''}`} onClick={() => setMaxPlayers(n)}>{n}</button>)}
@@ -97,14 +97,14 @@ export function TournamentDetailScreen() {
             <span className="pill" style={{ background: `color-mix(in srgb, ${TOURNAMENT_STATUS[t.status].color} 20%, transparent)`, color: TOURNAMENT_STATUS[t.status].color }}>{TOURNAMENT_STATUS[t.status].label}</span>
             {t.description && <p className="body-md mt-12">{t.description}</p>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-              {([[Users, 'Participants', `${t.participants.length}/${t.maxPlayers}`], [Coins, "Frais d'inscription", `${sc(t.entryFee)} SC`], [Trophy, 'Prize Pool', `${sc(p.prizePool)} SC`], [Calendar, 'Début', formatDate(t.startDate)], [LayoutGrid, 'Type', t.type === 'singleElimination' ? 'Élimination Simple' : 'Élimination Double']] as const).map(([I, l, v]) => (
+              {([[Users, 'Participants', `${t.participants.length}/${t.maxPlayers}`], [Coins, "Frais d'inscription", `${sc(t.entryFee)} XOF`], [Trophy, 'Prize Pool', `${sc(p.prizePool)} XOF`], [Calendar, 'Début', formatDate(t.startDate)], [LayoutGrid, 'Type', t.type === 'singleElimination' ? 'Élimination Simple' : 'Élimination Double']] as const).map(([I, l, v]) => (
                 <div key={l} className="card" style={{ padding: 14 }}><I size={20} color="var(--cyan)" /><p className="label-sm mt-8">{l}</p><p className="bold">{v}</p></div>
               ))}
             </div>
             <p className="section-title">Récompenses</p>
             {([['🥇 1ère place', p.first, '#FFC107'], ['🥈 2e place', p.second, '#B0BEC5'], ['🥉 3e place', p.third, '#A1887F']] as const).map(([l, v, col], i) => (
               <div key={l} className="row card" style={{ border: `1px solid ${col}` }}>
-                <span className="grow bold">{l}</span>{t.top3?.[i] && <span className="grey">{name(t.top3[i])}</span>}<span className="bold" style={{ color: col }}>{sc(v)} SC</span>
+                <span className="grow bold">{l}</span>{t.top3?.[i] && <span className="grey">{name(t.top3[i])}</span>}<span className="bold" style={{ color: col }}>{sc(v)} XOF</span>
               </div>
             ))}
             {t.status === 'completed' && t.winnerId && <p className="card mt-16 center-col headline-sm"><Crown color="var(--yellow)" size={36} />Champion : {name(t.winnerId)}</p>}
@@ -115,7 +115,7 @@ export function TournamentDetailScreen() {
               </Button>
             )}
             {t.status === 'registration' && !t.participants.includes(user.id) && (
-              <Button variant="outline" block style={{ marginTop: 12 }} onClick={() => run(() => tournamentService.join(t.id), 'Inscription réussie !')}>S'inscrire ({sc(t.entryFee)} SC)</Button>
+              <Button variant="outline" block style={{ marginTop: 12 }} onClick={() => run(() => tournamentService.join(t.id), 'Inscription réussie !')}>S'inscrire ({sc(t.entryFee)} XOF)</Button>
             )}
           </>
         )}

@@ -57,7 +57,7 @@ export async function notify(t: Tx, p: { userId: string; type: NotificationType;
 }
 const pseudo = async (t: Tx, id?: string | null) => (id ? (await t.get<User>('users', id))?.pseudo ?? 'Joueur' : 'Joueur')
 
-// ---------- Portefeuille (SkillCoins fictifs) ----------
+// ---------- Portefeuille en XOF ----------
 async function changeBalance(t: Tx, userId: string, fn: (b: User['walletBalance']) => User['walletBalance']) {
   const u = await getUser(t, userId)
   return saveUser(t, { ...u, walletBalance: fn(u.walletBalance) })
@@ -70,26 +70,26 @@ async function lockStake(t: Tx, userId: string, stake: number) {
 const releaseStake = (t: Tx, userId: string, stake: number) =>
   changeBalance(t, userId, (b) => ({ ...b, available: b.available + stake, pending: Math.max(0, b.pending - stake) }))
 async function addWinnings(t: Tx, userId: string, stake: number, winnings: number, relatedId: string) {
-  await addTx(t, userId, 'win', winnings, `Gain de ${winnings} SkillCoins`, 'completed', relatedId)
+  await addTx(t, userId, 'win', winnings, `Gain de ${winnings} XOF`, 'completed', relatedId)
   await changeBalance(t, userId, (b) => ({ ...b, pending: Math.max(0, b.pending - stake), withdrawable: b.withdrawable + winnings }))
 }
 async function deductLoss(t: Tx, userId: string, stake: number, relatedId: string) {
-  await addTx(t, userId, 'loss', -stake, `Perte de ${stake} SkillCoins`, 'completed', relatedId)
+  await addTx(t, userId, 'loss', -stake, `Perte de ${stake} XOF`, 'completed', relatedId)
   await changeBalance(t, userId, (b) => ({ ...b, pending: Math.max(0, b.pending - stake) }))
 }
 async function payOut(t: Tx, userId: string, amt: number, relatedId: string, label = "Gain attribué par l'arbitre") {
-  await addTx(t, userId, 'win', amt, `${label} : ${amt} SkillCoins`, 'completed', relatedId)
+  await addTx(t, userId, 'win', amt, `${label} : ${amt} XOF`, 'completed', relatedId)
   await changeBalance(t, userId, (b) => ({ ...b, withdrawable: b.withdrawable + amt }))
 }
 async function reverseWinnings(t: Tx, userId: string, amt: number, relatedId: string) {
-  await addTx(t, userId, 'loss', -amt, `Annulation de gain (litige) : ${amt} SkillCoins`, 'completed', relatedId)
+  await addTx(t, userId, 'loss', -amt, `Annulation de gain (litige) : ${amt} XOF`, 'completed', relatedId)
   await changeBalance(t, userId, (b) => {
     const w = b.withdrawable - amt
     return { ...b, withdrawable: Math.max(0, w), available: w < 0 ? Math.max(0, b.available + w) : b.available }
   })
 }
 async function refund(t: Tx, userId: string, stake: number, relatedId: string) {
-  await addTx(t, userId, 'transfer', stake, `Remboursement de mise : ${stake} SkillCoins`, 'completed', relatedId)
+  await addTx(t, userId, 'transfer', stake, `Remboursement de mise : ${stake} XOF`, 'completed', relatedId)
   await changeBalance(t, userId, (b) => ({ ...b, available: b.available + stake }))
 }
 async function updateStats(t: Tx, userId: string, d: { wins?: number; losses?: number; earned?: number; lost?: number; xp?: number }) {
@@ -102,22 +102,6 @@ async function updateStats(t: Tx, userId: string, d: { wins?: number; losses?: n
   }
   if (s.xp >= s.level * 100) s.level++
   await saveUser(t, { ...u, stats: s })
-}
-
-export const wallet = {
-  async deposit(t: Tx, me: User, a: { amount: unknown }) {
-    const n = amount(a.amount)
-    if (n > 10_000) throw new AppError('Maximum 10 000 SkillCoins par chargement')
-    await addTx(t, me.id, 'deposit', n, `Dépôt de ${n} SkillCoins`)
-    await changeBalance(t, me.id, (b) => ({ ...b, available: b.available + n }))
-  },
-  async withdraw(t: Tx, me: User, a: { amount: unknown }) {
-    const n = amount(a.amount)
-    const u = await getUser(t, me.id)
-    if (u.walletBalance.withdrawable < n) throw new AppError('Solde insuffisant')
-    await addTx(t, me.id, 'withdraw', n, `Retrait de ${n} SkillCoins`, 'pending')
-    await saveUser(t, { ...u, walletBalance: { ...u.walletBalance, withdrawable: u.walletBalance.withdrawable - n } })
-  },
 }
 
 // ---------- Défis ----------
@@ -156,7 +140,7 @@ async function completeChallenge(t: Tx, c: Challenge, winnerId: string) {
   await updateStats(t, winnerId, { wins: 1, earned: winnerAmount, xp: 50 })
   await deductLoss(t, loserId, c.amount, c.id)
   await updateStats(t, loserId, { losses: 1, lost: c.amount, xp: 10 })
-  await notify(t, { userId: winnerId, type: 'match', title: '🏆 Victoire !', message: `Vous avez gagné ${winnerAmount} SkillCoins !`, relatedId: c.id, priority: 'high' })
+  await notify(t, { userId: winnerId, type: 'match', title: '🏆 Victoire !', message: `Vous avez gagné ${winnerAmount} XOF !`, relatedId: c.id, priority: 'high' })
   await notify(t, { userId: loserId, type: 'match', title: '😔 Défaite', message: `Vous avez perdu ce match. Vous avez ${DISPUTE_WINDOW_MINUTES} minutes pour ouvrir un litige si nécessaire.`, relatedId: c.id, priority: 'high' })
   return saved
 }
@@ -179,7 +163,7 @@ export const challenge = {
       expiresAt: new Date(Date.now() + hours * 3600000).toISOString(), createdAt: now(),
       chatMessages: [], matchDetails: null, dispute: null, completedAt: null,
     }
-    if (invited) await notify(t, { userId: invited.id, type: 'challenge', title: '⚔️ Tu es défié !', message: `${me.pseudo} te lance un défi de ${stake} SkillCoins.`, relatedId: c.id, priority: 'high' })
+    if (invited) await notify(t, { userId: invited.id, type: 'challenge', title: '⚔️ Tu es défié !', message: `${me.pseudo} te lance un défi de ${stake} XOF.`, relatedId: c.id, priority: 'high' })
     return t.put('challenges', c)
   },
 
@@ -196,7 +180,7 @@ export const challenge = {
     }
     await lockStake(t, me.id, c.amount)
     const saved = await t.put('challenges', { ...c, opponentId: me.id, status: 'accepted', matchDetails: { ...emptyDetails(), matchCode: matchCode(), acceptedAt: now(), inRoom: [] } })
-    await notify(t, { userId: c.creatorId, type: 'challenge', title: '🎮 Défi accepté !', message: `${me.pseudo} a accepté votre défi de ${c.amount} SkillCoins`, relatedId: c.id, priority: 'high' })
+    await notify(t, { userId: c.creatorId, type: 'challenge', title: '🎮 Défi accepté !', message: `${me.pseudo} a accepté votre défi de ${c.amount} XOF`, relatedId: c.id, priority: 'high' })
     return saved
   },
 
@@ -264,8 +248,8 @@ export const challenge = {
     await releaseStake(t, c.opponentId, c.amount)
     await t.put('challenges', { ...c, status: 'cancelled', completedAt: now() })
     const other = c.creatorId === me.id ? c.opponentId : c.creatorId
-    await notify(t, { userId: other, type: 'match', title: '⌛ Match annulé', message: `Le match n'a pas commencé à temps : ${me.pseudo} l'a annulé. Ta mise de ${c.amount} SkillCoins t'est rendue.`, relatedId: c.id })
-    await notify(t, { userId: me.id, type: 'match', title: '⌛ Match annulé', message: `Ta mise de ${c.amount} SkillCoins t'est rendue.`, relatedId: c.id })
+    await notify(t, { userId: other, type: 'match', title: '⌛ Match annulé', message: `Le match n'a pas commencé à temps : ${me.pseudo} l'a annulé. Ta mise de ${c.amount} XOF t'est rendue.`, relatedId: c.id })
+    await notify(t, { userId: me.id, type: 'match', title: '⌛ Match annulé', message: `Ta mise de ${c.amount} XOF t'est rendue.`, relatedId: c.id })
   },
 
   /** Code de salle eFootball partagé entre les deux joueurs. */
@@ -438,7 +422,7 @@ export async function agreeCancel(t: Tx, me: User, a: { id: unknown; withdraw?: 
     matchDetails: withDetails(c, { cancelVotes: [...votes], winnerId: null, paidOut: false }),
   })
   for (const id of [c.creatorId, c.opponentId]) {
-    await notify(t, { userId: id, type: 'match', title: '🤝 Match annulé', message: `${resolution} : ta mise de ${c.amount} SkillCoins t'est rendue.`, relatedId: c.id })
+    await notify(t, { userId: id, type: 'match', title: '🤝 Match annulé', message: `${resolution} : ta mise de ${c.amount} XOF t'est rendue.`, relatedId: c.id })
   }
   return { state: 'cancelled' as const }
 }
@@ -452,7 +436,7 @@ export async function expirePendingChallenges(t: Tx) {
       if (locked?.status !== 'pending') continue
       await t.put('challenges', { ...locked, status: 'cancelled' })
       await releaseStake(t, c.creatorId, c.amount)
-      await notify(t, { userId: c.creatorId, type: 'challenge', title: '⌛ Défi expiré', message: `Personne n'a accepté votre défi de ${c.amount} SkillCoins. Votre mise est rendue.`, relatedId: c.id })
+      await notify(t, { userId: c.creatorId, type: 'challenge', title: '⌛ Défi expiré', message: `Personne n'a accepté votre défi de ${c.amount} XOF. Votre mise est rendue.`, relatedId: c.id })
     }
   }
 }

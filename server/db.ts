@@ -56,6 +56,18 @@ export async function migrate() {
       data bytea not null,
       created_at timestamptz not null default now()
     );
+    create table if not exists payment_intents (
+      id text primary key,
+      user_id text not null,
+      kind text not null check (kind in ('deposit', 'withdraw')),
+      amount bigint not null check (amount > 0),
+      currency text not null check (currency = 'XOF'),
+      status text not null check (status in ('pending', 'completed', 'failed')),
+      provider_token text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+    create index if not exists payment_intents_user_idx on payment_intents (user_id, created_at desc);
   `)
 }
 

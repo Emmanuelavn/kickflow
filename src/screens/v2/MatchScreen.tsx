@@ -46,7 +46,7 @@ export function MatchScreenV2() {
 
   const right = c.status === 'inProgress'
     ? <span className="k-pill" style={{ background: 'var(--k-s1)', color: 'var(--k-muted)', fontSize: 14 }}><Clock size={14} />{clock}</span>
-    : <span className="k-pill" style={{ background: 'rgba(255,214,10,.12)', color: 'var(--yellow)', fontSize: 14 }}>{sc(c.amount)} SC</span>
+    : <span className="k-pill" style={{ background: 'rgba(255,214,10,.12)', color: 'var(--yellow)', fontSize: 14 }}>{sc(c.amount)} XOF</span>
 
   return (
     <div className="screen">
@@ -85,7 +85,7 @@ function Waiting({ c, me }: { c: Challenge; me: User }) {
   const invited = c.invitedUserId ? userService.getById(c.invitedUserId) : undefined
   const mine = c.creatorId === me.id
   async function share() {
-    const text = `Je te défie sur KickFlow pour ${sc(c.amount)} SkillCoins ! ${location.origin}/match/${c.id}`
+    const text = `Je te défie sur KickFlow pour ${sc(c.amount)} XOF ! ${location.origin}/match/${c.id}`
     if (navigator.share) { try { await navigator.share({ title: 'Défi KickFlow', text }) } catch { /* annulé */ } }
     else copy(text, snack, 'Lien copié')
   }
@@ -99,7 +99,7 @@ function Waiting({ c, me }: { c: Challenge; me: User }) {
     <div className="k-card now" style={{ textAlign: 'center' }}>
       <Hourglass size={48} color="var(--cyan)" className="pulse" />
       <h3 className="headline-sm mt-12">{invited ? `En attente de ${invited.pseudo}` : 'En attente d\'un adversaire'}</h3>
-      <p className="k-muted k-small mt-8">Ta mise de {sc(c.amount)} SC est bloquée. Le gagnant recevra {sc(prizeOf(c.amount))} SC. Tu seras prévenu dès qu'un joueur accepte.</p>
+      <p className="k-muted k-small mt-8">Ta mise de {sc(c.amount)} XOF est bloquée. Le gagnant recevra {sc(prizeOf(c.amount))} XOF. Tu seras prévenu dès qu'un joueur accepte.</p>
       <button type="button" className="k-btn primary block mt-16" onClick={share}><Share2 size={18} />Partager le défi sur WhatsApp</button>
       <button type="button" className="k-btn danger block mt-8" disabled={busy} onClick={async () => { if (await run(async () => { await challengeService.cancel(c.id); return true }, 'Défi annulé, mise rendue')) navigate('/defis', { replace: true }) }}>Annuler le défi</button>
     </div>
@@ -343,7 +343,7 @@ function CancelAgreement({ c, me, opp }: { c: Challenge; me: User; opp?: User })
     <div className="k-card" style={{ marginTop: 16, borderStyle: 'dashed' }}>
       {theirs && !mine ? (
         <>
-          <p className="k-small"><b>{opp?.pseudo}</b> propose d'annuler le match : chacun récupère sa mise de {sc(c.amount)} SC.</p>
+          <p className="k-small"><b>{opp?.pseudo}</b> propose d'annuler le match : chacun récupère sa mise de {sc(c.amount)} XOF.</p>
           <div className="row" style={{ gap: 8, marginTop: 10 }}>
             <button type="button" className="k-btn primary sm grow" disabled={busy} onClick={() => run(() => challengeService.agreeCancel(c.id), 'Match annulé, mise rendue')}>Accepter l'annulation</button>
           </div>
@@ -411,9 +411,9 @@ function Result({ c, me, opp }: { c: Challenge; me: User; opp?: User }) {
       {myScore != null && <div style={{ font: '800 52px var(--font-title)' }}>{myScore} – {theirScore}</div>}
       <div className="k-muted">contre {opp?.pseudo}</div>
       <div className="k-card" style={{ width: '100%', marginTop: 24, textAlign: 'left' }}>
-        <div className="row between"><span className="k-muted">{won ? 'Gain' : 'Mise perdue'}</span><b style={{ color: won ? 'var(--yellow)' : 'var(--k-red)', fontSize: 18 }}>{won ? `+${sc(prizeOf(c.amount))}` : `−${sc(c.amount)}`} SC</b></div>
+        <div className="row between"><span className="k-muted">{won ? 'Gain' : 'Mise perdue'}</span><b style={{ color: won ? 'var(--yellow)' : 'var(--k-red)', fontSize: 18 }}>{won ? `+${sc(prizeOf(c.amount))}` : `−${sc(c.amount)}`} XOF</b></div>
         <div className="row between" style={{ marginTop: 10 }}><span className="k-muted">Expérience</span><b>+{won ? 50 : 10} XP</b></div>
-        <div className="row between" style={{ marginTop: 10 }}><span className="k-muted">Ton solde</span><b>{sc(me.walletBalance.available + me.walletBalance.withdrawable)} SC</b></div>
+        <div className="row between" style={{ marginTop: 10 }}><span className="k-muted">Ton solde</span><b>{sc(me.walletBalance.available + me.walletBalance.withdrawable)} XOF</b></div>
       </div>
       {opp && <button type="button" className="k-btn primary block" style={{ marginTop: 20 }} onClick={() => navigate(`/challenges/create?to=${opp.id}&amount=${c.amount}`)}>Proposer une revanche</button>}
       <button type="button" className="k-btn ghost block" style={{ marginTop: 10 }} onClick={() => navigate('/', { replace: true })}>Retour à l'accueil</button>

@@ -64,7 +64,7 @@ export function SettingsScreen() {
     challenge: useSetting('challenge_notifications', true), tournament: useSetting('tournament_notifications', true), stream: useSetting('stream_notifications', true),
     friend: useSetting('friend_request_notifications', true), publicProfile: useSetting('profile_public', true), online: useSetting('show_online_status', true),
     allowFriends: useSetting('allow_friend_requests', true), dark: useSetting('dark_mode', true),
-    language: useSetting('language', 'Français'), currency: useSetting('currency', 'FCFA'),
+    language: useSetting('language', 'Français'), currency: useSetting('currency', 'XOF'),
   }
   const [sheet, setSheet] = useState<'language' | 'currency' | 'password' | 'logout' | 'delete' | null>(null)
   const [pw, setPw] = useState({ old: '', next: '', confirm: '' })
@@ -130,7 +130,7 @@ export function SettingsScreen() {
 
       <Dialog open={sheet === 'language' || sheet === 'currency'} onClose={() => setSheet(null)}>
         <h3 className="headline-sm">{sheet === 'language' ? 'Choisir la langue' : 'Choisir la devise'}</h3>
-        {(sheet === 'language' ? ['Français', 'English', 'العربية'] : ['FCFA', 'EUR', 'USD']).map((o) => {
+        {(sheet === 'language' ? ['Français', 'English', 'العربية'] : ['XOF']).map((o) => {
           const [val, set] = sheet === 'language' ? s.language : s.currency
           return (
             <label key={o} className="row" style={{ padding: '12px 0', cursor: 'pointer' }}>

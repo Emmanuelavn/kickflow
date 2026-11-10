@@ -69,7 +69,7 @@ export function HomeV2() {
           <div className="k-card now">
             <div className="row between">
               <span className="k-label" style={{ color: 'var(--cyan)' }}>Match en cours</span>
-              <span className="k-pill" style={{ background: 'rgba(255,214,10,.12)', color: 'var(--yellow)' }}>{sc(current.amount)} SC</span>
+              <span className="k-pill" style={{ background: 'rgba(255,214,10,.12)', color: 'var(--yellow)' }}>{sc(current.amount)} XOF</span>
             </div>
             <div className="row" style={{ marginTop: 12 }}>
               <Avatar name={opponent.pseudo} photo={opponent.profilePhoto} size={40} />
@@ -85,7 +85,7 @@ export function HomeV2() {
         {waiting.length > 0 && (
           <button type="button" className="k-card row" style={{ width: '100%', textAlign: 'left', marginTop: current ? 12 : 0, cursor: 'pointer', color: 'inherit' }} onClick={() => navigate(`/match/${waiting[0].id}`)}>
             <span className="k-pill" style={{ background: 'rgba(255,214,10,.12)', color: 'var(--yellow)' }}>En attente</span>
-            <span className="grow k-small">{waiting.length === 1 ? `Ton défi de ${sc(waiting[0].amount)} SC attend un adversaire` : `${waiting.length} défis attendent un adversaire`}</span>
+            <span className="grow k-small">{waiting.length === 1 ? `Ton défi de ${sc(waiting[0].amount)} XOF attend un adversaire` : `${waiting.length} défis attendent un adversaire`}</span>
             <ChevronRight size={18} className="k-dim" />
           </button>
         )}
@@ -152,7 +152,7 @@ export function DefisV2() {
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un joueur" aria-label="Rechercher un joueur" style={{ height: 42 }} />
             </label>
             <div className="k-chips" style={{ marginTop: 10 }}>
-              {([['all', 'Tous'], ['friends', 'Mes amis'], ['level', 'Mon niveau'], ['small', '≤ 50 SC']] as const).map(([v, l]) => (
+              {([['all', 'Tous'], ['friends', 'Mes amis'], ['level', 'Mon niveau'], ['small', '≤ 50 XOF']] as const).map(([v, l]) => (
                 <button key={v} type="button" className={`k-chip sm${filter === v ? ' on' : ''}`} onClick={() => setFilter(v)}>{l}</button>
               ))}
             </div>
@@ -247,7 +247,7 @@ export function CreateChallengeV2() {
 
   async function publish() {
     if (stake < 1) return snack('Choisis une mise', 'warning')
-    if (stake > me.walletBalance.available) return snack(`Solde insuffisant : tu as ${sc(me.walletBalance.available)} SC`, 'error')
+    if (stake > me.walletBalance.available) return snack(`Solde insuffisant : tu as ${sc(me.walletBalance.available)} XOF`, 'error')
     if (who === 'friend' && !friendId) return snack('Choisis un ami', 'warning')
     const c = await run(() => challengeService.create({
       amount: stake, matchType: 'Défi 1v1', platform, challengeType: 'public', expirationHours: hours,
@@ -260,7 +260,7 @@ export function CreateChallengeV2() {
     <div className="screen">
       <TopBar back title="Lancer un défi" />
       <div className="k-body" style={{ flex: 1 }}>
-        <p className="k-label" style={{ margin: '8px 0 10px' }}>SkillCoins en jeu</p>
+        <p className="k-label" style={{ margin: '8px 0 10px' }}>XOF en jeu</p>
         <div className="k-chips">
           {AMOUNTS.map((a) => <button key={a} type="button" className={`k-chip${!custom && amount === a ? ' on' : ''}`} onClick={() => { setAmount(a); setCustom('') }}>{a}</button>)}
           <label className={`k-chip${custom ? ' on' : ''}`} style={{ paddingRight: 8 }}>
@@ -268,7 +268,7 @@ export function CreateChallengeV2() {
               style={{ width: 64, border: 0, outline: 0, background: 'transparent', color: 'inherit', font: 'inherit' }} />
           </label>
         </div>
-        <p className="k-dim k-small" style={{ marginTop: 8 }}>Tu as {sc(me.walletBalance.available)} SC disponibles</p>
+        <p className="k-dim k-small" style={{ marginTop: 8 }}>Tu as {sc(me.walletBalance.available)} XOF disponibles</p>
 
         <p className="k-label" style={{ margin: '24px 0 10px' }}>Contre qui ?</p>
         <div className="k-chips">
@@ -300,9 +300,9 @@ export function CreateChallengeV2() {
         </div>
 
         <div className="k-card" style={{ marginTop: 26 }}>
-          <div className="row between"><span className="k-muted">Ta mise</span><b>{sc(stake)} SC</b></div>
-          <div className="row between" style={{ marginTop: 8 }}><span className="k-muted">Le gagnant reçoit</span><b className="yellow">{sc(prizeOf(stake))} SC</b></div>
-          <div className="k-dim k-xs" style={{ marginTop: 8 }}>Cagnotte de {sc(stake * 2)} SC moins 20 % de commission. Si personne n'accepte, ta mise est rendue.</div>
+          <div className="row between"><span className="k-muted">Ta mise</span><b>{sc(stake)} XOF</b></div>
+          <div className="row between" style={{ marginTop: 8 }}><span className="k-muted">Le gagnant reçoit</span><b className="yellow">{sc(prizeOf(stake))} XOF</b></div>
+          <div className="k-dim k-xs" style={{ marginTop: 8 }}>Cagnotte de {sc(stake * 2)} XOF moins 20 % de commission. Si personne n'accepte, ta mise est rendue.</div>
         </div>
       </div>
       <div style={{ padding: '16px 20px calc(24px + var(--safe-bottom))' }}>

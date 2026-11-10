@@ -23,7 +23,7 @@ export function TopBar({ title, back, right }: { title?: ReactNode; back?: boole
 
 export function Coins({ value, onClick }: { value: number; onClick?: () => void }) {
   return (
-    <button type="button" className="k-coins" onClick={onClick} style={{ border: 0, cursor: onClick ? 'pointer' : 'default' }} aria-label={`${sc(value)} SkillCoins`}>
+    <button type="button" className="k-coins" onClick={onClick} style={{ border: 0, cursor: onClick ? 'pointer' : 'default' }} aria-label={`${sc(value)} XOF`}>
       <CircleDollarSign size={16} />{sc(value)}
     </button>
   )
@@ -89,8 +89,8 @@ export function ChallengeRow({ c }: { c: Challenge }) {
         : <button type="button" className="k-btn primary sm" onClick={() => setConfirm(true)}>Jouer</button>}
       <Dialog open={confirm} onClose={() => setConfirm(false)}>
         <h3 className="headline-sm">Jouer contre {creator?.pseudo} ?</h3>
-        <p className="body-md mt-12">Ta mise : <b style={{ color: '#fff' }}>{sc(c.amount)} SC</b>. Le gagnant reçoit <b className="yellow">{sc(prizeOf(c.amount))} SC</b>.</p>
-        {tooPoor && <p className="mt-8" style={{ color: 'var(--k-red)' }}>Solde insuffisant : tu as {sc(me.walletBalance.available)} SC.</p>}
+        <p className="body-md mt-12">Ta mise : <b style={{ color: '#fff' }}>{sc(c.amount)} XOF</b>. Le gagnant reçoit <b className="yellow">{sc(prizeOf(c.amount))} XOF</b>.</p>
+        {tooPoor && <p className="mt-8" style={{ color: 'var(--k-red)' }}>Solde insuffisant : tu as {sc(me.walletBalance.available)} XOF.</p>}
         <div className="dialog-actions">
           <Button variant="text" onClick={() => setConfirm(false)}>Annuler</Button>
           <Button sm loading={busy} disabled={tooPoor} onClick={accept}>Accepter le défi</Button>

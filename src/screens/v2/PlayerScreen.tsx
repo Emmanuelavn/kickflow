@@ -59,7 +59,7 @@ export function PlayerScreen() {
         {h2h.length > 0 && (
           <div className="k-card">
             <div className="row between"><span className="k-muted">Vos confrontations</span><b>{myWins} – {h2h.length - myWins}</b></div>
-            <div className="k-dim k-xs mt-4">{h2h.length} match{h2h.length > 1 ? 's' : ''} joué{h2h.length > 1 ? 's' : ''} ensemble · gains cumulés de {p.pseudo} : {sc(p.stats.totalEarned)} SC</div>
+            <div className="k-dim k-xs mt-4">{h2h.length} match{h2h.length > 1 ? 's' : ''} joué{h2h.length > 1 ? 's' : ''} ensemble · gains cumulés de {p.pseudo} : {sc(p.stats.totalEarned)} XOF</div>
           </div>
         )}
 

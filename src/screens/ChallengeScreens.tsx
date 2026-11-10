@@ -39,7 +39,7 @@ export function ChallengeDetailScreen() {
       <AppBar title="Détails du défi" back />
       <div className="screen-body">
         <div className="card row between" style={{ background: 'linear-gradient(135deg, rgba(0,229,255,.25), rgba(157,78,221,.25))' }}>
-          <div><p className="grey" style={{ fontSize: 13 }}>Montant</p><p className="headline-lg yellow">{sc(c.amount)} SC</p></div>
+          <div><p className="grey" style={{ fontSize: 13 }}>Montant</p><p className="headline-lg yellow">{sc(c.amount)} XOF</p></div>
           <div style={{ textAlign: 'right' }}><p className="grey" style={{ fontSize: 13 }}>Statut</p>
             <span className="pill" style={{ background: `color-mix(in srgb, ${s.color} 20%, transparent)`, color: s.color, fontSize: 13 }}>{s.short}</span></div>
         </div>

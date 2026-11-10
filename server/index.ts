@@ -8,15 +8,14 @@ import compression from 'compression'
 import { AppError, migrate, pool, tx, type Tx } from './db.ts'
 import { changePassword, deleteAccount, forgotPassword, login, register, resetPassword, verifyToken } from './auth.ts'
 import { publicKey, pushEnabled, sendPushes, subscribe, unsubscribe } from './push.ts'
-import { agreeCancel, challenge, expirePendingChallenges, notification, stream, tournament, user, wallet } from './logic.ts'
+import { agreeCancel, challenge, expirePendingChallenges, notification, stream, tournament, user } from './logic.ts'
 import { attachRealtime, broadcast, changesFor } from './realtime.ts'
 import { seed } from './seed.ts'
+import { confirmPayment, startDeposit, startWithdrawal, verifyPaymentCallback } from './payments.ts'
 import type { User } from '../src/lib/types.ts'
 
 type Handler = (t: Tx, me: User, args: Record<string, unknown>) => Promise<unknown>
 const RPC: Record<string, Handler> = {
-  'wallet.deposit': wallet.deposit as Handler,
-  'wallet.withdraw': wallet.withdraw as Handler,
   'challenge.create': challenge.create as Handler,
   'challenge.accept': challenge.accept as Handler,
   'challenge.cancel': challenge.cancel as Handler,
@@ -134,6 +133,37 @@ app.post('/api/push/unsubscribe', wrap(async (req, res) => {
 
 app.get('/api/me', wrap(async (req, res) => {
   res.json({ user: await currentUser(req) })
+}))
+
+app.post('/api/payments/deposit', wrap(async (req, res) => {
+  const me = await currentUser(req)
+  res.json(await startDeposit(me, req.body?.amount))
+}))
+
+app.post('/api/payments/withdraw', wrap(async (req, res) => {
+  const me = await currentUser(req)
+  res.json(await startWithdrawal(me, req.body?.amount))
+}))
+
+async function handlePaymentCallback(id: string, signature: string) {
+  if (!verifyPaymentCallback(id, signature)) throw new AppError('Signature de paiement invalide', 400)
+  return confirmPayment(id, signature)
+}
+
+app.post('/api/payments/callback', wrap(async (req, res) => {
+  const id = String(req.query.id ?? req.body?.custom_data?.transaction_id ?? req.body?.transaction_id ?? '')
+  const signature = String(req.query.signature ?? req.body?.signature ?? '')
+  res.json({ status: await handlePaymentCallback(id, signature) })
+}))
+
+app.get('/api/payments/return', wrap(async (req, res) => {
+  const id = String(req.query.id ?? '')
+  const signature = String(req.query.signature ?? '')
+  let status = 'failed'
+  try { status = await handlePaymentCallback(id, signature) } catch { /* retour utilisateur, afficher l'état sans détail technique */ }
+  const target = new URL('/wallet', process.env.APP_URL ?? 'http://localhost:8787')
+  target.searchParams.set('payment', status)
+  res.redirect(303, target.toString())
 }))
 
 app.post('/api/rpc/:name', wrap(async (req, res) => {
