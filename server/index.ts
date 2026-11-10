@@ -168,7 +168,16 @@ app.use('/api', (_req, res) => res.status(404).json({ error: 'Introuvable' }))
 
 // Fichiers de l'appli (dossier dist/ produit par « npm run build »)
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
-app.use(express.static(dist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable') } }))
+// Fichiers versionnés (assets/) : cache long. Fichiers de mise à jour de l'appli (sw.js, registerSW.js,
+// manifest, push-sw.js…) : jamais en cache, pour que chaque joueur reçoive la nouvelle version tout de suite.
+app.use(express.static(dist, {
+  index: false,
+  setHeaders: (res, p) => {
+    if (p.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    else if (/\.(js|webmanifest|json|html)$/.test(p)) res.setHeader('Cache-Control', 'no-cache')
+    else res.setHeader('Cache-Control', 'public, max-age=86400')
+  },
+}))
 app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html'), { headers: { 'Cache-Control': 'no-cache' } }))
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
